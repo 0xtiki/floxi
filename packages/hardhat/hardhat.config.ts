@@ -21,7 +21,7 @@ const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.17",
+    version: "0.8.20",
     settings: {
       optimizer: {
         enabled: true,
@@ -42,8 +42,12 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       forking: {
-        url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
-        enabled: process.env.MAINNET_FORKING_ENABLED === "true",
+        // url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
+        // enabled: process.env.MAINNET_FORKING_ENABLED === "true",
+        // url: "https://rpc.testnet.frax.com",
+        url: "https://rpc.frax.com",
+        enabled: true,
+        blockNumber: 7891572,
       },
     },
     mainnet: {
@@ -116,6 +120,14 @@ const config: HardhatUserConfig = {
     },
     pgnTestnet: {
       url: "https://sepolia.publicgoods.network",
+      accounts: [deployerPrivateKey],
+    },
+    fraxtal: {
+      url: "https://rpc.frax.com",
+      accounts: [deployerPrivateKey],
+    },
+    fraxtalTestnet: {
+      url: "https://rpc.testnet.frax.com",
       accounts: [deployerPrivateKey],
     },
   },
