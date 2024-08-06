@@ -37,6 +37,9 @@ const config: HardhatUserConfig = {
       default: 0,
     },
   },
+  mocha: {
+    timeout: 200000, // 200 seconds max for running tests
+  },
   networks: {
     // View the networks that are pre-configured.
     // If the network you are looking for is not here you can add new network settings

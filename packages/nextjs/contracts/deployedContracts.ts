@@ -6,8 +6,8 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 const deployedContracts = {
   31337: {
-    FloxiSfraxEth: {
-      address: "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+    FloxiSfrxEth: {
+      address: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
       abi: [
         {
           inputs: [
@@ -18,8 +18,28 @@ const deployedContracts = {
             },
             {
               internalType: "address",
+              name: "remoteAsset_",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "remoteContract_",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "treasury_",
               type: "address",
+            },
+            {
+              internalType: "address",
+              name: "l2StandardBridgeProxy_",
+              type: "address",
+            },
+            {
+              internalType: "bytes4",
+              name: "l1Selector_",
+              type: "bytes4",
             },
           ],
           stateMutability: "nonpayable",
@@ -225,6 +245,11 @@ const deployedContracts = {
         {
           inputs: [],
           name: "MathOverflowedMulDiv",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
           type: "error",
         },
         {
@@ -440,6 +465,25 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "uint256",
+              name: "gasPriceGwei",
+              type: "uint256",
+            },
+          ],
+          name: "calculateFeeInWei",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
               name: "shares",
               type: "uint256",
             },
@@ -509,6 +553,19 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "getL1Assets",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
