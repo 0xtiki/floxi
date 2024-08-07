@@ -18,6 +18,8 @@ interface IL2StandardBridge {
         uint32 _minGasLimit,
         bytes calldata _extraData
     ) external;
+
+    function paused() external view returns (bool);
 }
 
 /**
@@ -59,6 +61,9 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
 
     // Placeholder gas price, intended to be fetched from an oracle in a production setup
     uint256 private constant _GAS_PRICE = 30;
+
+    // Placeholder, will be defined more appropriately in production (probably adding a batcher at some point)
+    uint256 private constant _MIN_DEPOSIT = 1000000000000000; // 0.001 ether
 
     constructor(
         IERC20 asset_,
@@ -120,6 +125,10 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
      */    
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal virtual override nonReentrant {
 
+        require (assets > _MIN_DEPOSIT, "Minimum deposit amount not met");
+
+        require (IL2StandardBridge(_l2StandardBridgeProxy).paused() == false);
+
         uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
         address recipient = _entryFeeRecipient();
 
@@ -129,11 +138,11 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
             SafeERC20.safeTransfer(IERC20(asset()), recipient, fee);
         }
 
-        bytes memory extraData = abi.encodeWithSelector(
-            _l1Selector,
-            assets - fee,
-            _remoteContract
-        );
+        // bytes memory extraData = abi.encodeWithSelector(
+        //     _l1Selector,
+        //     assets - fee,
+        //     _remoteContract
+        // );
 
         try IL2StandardBridge(_l2StandardBridgeProxy).bridgeERC20To(
             address(_asset),
@@ -141,7 +150,7 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
             _remoteContract,
             assets - fee,
             120000,
-            extraData
+            ""
         ) {
             _l1Assets += assets - fee;
         } catch {

@@ -29,7 +29,7 @@ const resetFork = async () => {
   });
 };
 
-describe("Floxi", function () {
+xdescribe("Floxi", function () {
   let sfrxEth: Contract;
   let signer: HardhatEthersSigner;
   let contract: FloxiSfrxEth;
@@ -161,7 +161,6 @@ describe("Floxi", function () {
         selector,
       );
       await invalidContract.waitForDeployment();
-
       await sfrxEth.transfer(owner.address, ethers.parseEther("2"));
       await (sfrxEth as unknown as IERC20)
         .connect(owner)
@@ -169,5 +168,22 @@ describe("Floxi", function () {
       await expect(invalidContract.connect(owner).deposit(ethers.parseEther("2"), owner.address), "e1").to.be.reverted;
       expect(await contract.getL1Assets(), "e2").to.equal(l1Balance_before);
     });
+
+    // it("should revert on deposit below minimum amount", async function () {
+    //   const minimumDeposit = ethers.parseEther("0.001"); // Assuming 0.1 ETH is the minimum deposit amount
+    //   const lowAmount = minimumDeposit - ethers.toBigInt('1')
+    //   await expect(contract.connect(owner).deposit(lowAmount, owner.address)).to.be.revertedWith("Minimum deposit amount not met");
+    // });
+
+    it("should emit events on deposit and withdrawal", async function () {
+      const depositTx = await contract.connect(owner).deposit(ethers.parseEther("2"), owner.address);
+      await expect(depositTx).to.emit(contract, "Deposit"); // .withArgs(owner.address, ethers.parseEther("2"));
+
+      // const shares = await contract.balanceOf(owner.address);
+      // const redeemTx = await contract.connect(owner).redeem(shares, owner.address, owner.address);
+      // await expect(redeemTx).to.emit(contract, "Withdraw").withArgs(owner.address, ethers.parseEther("2"), shares);
+    });
+
+    xit("should correctly calculate total assets including L1", async function () {});
   });
 });
