@@ -4,23 +4,17 @@ import sfrxEthAbi from "../contracts/sfrxEthAbi.json";
 import { Contract } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { L1FloxiSfrxEth } from "../typechain-types/contracts/L1FloxiSfrxEth.sol";
-// import { IERC20 } from "../typechain-types";
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const L2_sfrxEth = "0xFC00000000000000000000000000000000000005";
-// const sFrxEthHoleskyMain = "0xa63f56985F9C7F3bc9fFc5685535649e0C1a55f3";
 const sfrxEthEthereumMainnet = "0xac3E018457B222d93114458476f3E3416Abbe38F";
-// const bigSFraxHolderFraxtal = "0x66d9AF69E6845E8666f355676a267a726c04Ea4e";
 const bigSFraxHolderMainnet = "0x46782D268FAD71DaC3383Ccf2dfc44C861fb4c7D";
-// const l2StandardBridge = "0x4200000000000000000000000000000000000010";
-// const floxiMainnet = "0x0000000000000000000000000000000000000000";
 const eigenlayerStrategyManager = "0x858646372CC42E1A627fcE94aa7A7033e7CF075A";
 const eigenLayerStrategy = "0x8CA7A5d6f3acd3A7A8bC468a8CD0FB14B6BD28b6";
-const eigenLayerDelegationManager = "0xf97E97649Da958d290e84E6D571c32F4b7F475e4";
-// const FORK_BLOCK = 7891572;
-const FORK_BLOCK = 20476083;
-// const fraxtalMainnetRPC = "https://rpc.frax.com";
+const eigenLayerDelegationManager = "0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A";
+const FORK_BLOCK = 20476083; // mainnet
 const ethereumMainnetRPC = `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`;
+const eigenYields = "0x5ACCC90436492F24E6aF278569691e2c942A676d";
 
 const resetFork = async () => {
   await hre.network.provider.request({
@@ -39,6 +33,7 @@ const resetFork = async () => {
 describe("L1Floxi", function () {
   let sfrxEth: Contract;
   let eigenStrategyMan: Contract;
+  let eigenDelegationMan: Contract;
   let signer: HardhatEthersSigner;
   let contract: L1FloxiSfrxEth;
   let owner: HardhatEthersSigner;
@@ -86,7 +81,15 @@ describe("L1Floxi", function () {
       "function stakerStrategyListLength(address) external view returns (uint256)",
       "function delegation() external view returns (address)",
     ];
-    eigenStrategyMan = new ethers.Contract(eigenlayerStrategyManager, strategyManagerAbi, signer);
+    eigenStrategyMan = new ethers.Contract(eigenlayerStrategyManager, strategyManagerAbi, owner);
+
+    const delegationManagerAbi = [
+      "function isDelegated(address) external view returns (bool)",
+      "function delegatedTo(address) external view returns (address)",
+      "function isOperator(address) external view returns (bool)",
+    ];
+
+    eigenDelegationMan = new ethers.Contract(eigenLayerDelegationManager, delegationManagerAbi, owner);
   });
 
   describe("Floxi Staked Frax Ether contract", function () {
@@ -122,6 +125,15 @@ describe("L1Floxi", function () {
       );
       expect(await contract.stakedAssets()).to.equal(ethers.parseEther("10"));
       expect(await contract.totalAssets()).to.equal(ethers.parseEther("10"));
+    });
+
+    it("should delegate to operator", async function () {
+      const contractAddress = await contract.getAddress();
+      console.log(await eigenDelegationMan.isOperator(eigenYields));
+      const delegateTx = await contract.connect(owner).delegate(eigenYields);
+      await delegateTx.wait();
+      expect(await eigenDelegationMan.isDelegated(contractAddress)).to.equal(true);
+      expect(await eigenDelegationMan.delegatedTo(contractAddress)).to.equal(eigenYields);
     });
 
     xit("should revert on deposit on L1floxi", async function () {

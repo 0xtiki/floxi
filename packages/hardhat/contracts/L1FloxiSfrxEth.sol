@@ -5,7 +5,7 @@ import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 interface IFraxtalL1StandardBridge {
     function finalizeERC20Withdrawal(
@@ -21,8 +21,24 @@ interface IFraxtalL1StandardBridge {
     function paused() external view returns (bool);
 }
 
+interface ISignatureUtils {
+    // @notice Struct that bundles together a signature and an expiration time for the signature. Used primarily for stack management.
+    struct SignatureWithExpiry {
+        // the signature itself, formatted as a single bytes object
+        bytes signature;
+        // the expiration timestamp (UTC) of the signature
+        uint256 expiry;
+    }
+}
+
 interface IEigenLayerDelegationManager {
-    function delegateTo(address operator) external;
+    function delegateTo(
+        address operato,
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+        bytes32 approverSaltr
+    ) 
+        external;
+    
     function paused() external view returns (bool);
 }
 
@@ -111,9 +127,13 @@ contract L1FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     function delegate(address operator_) external nonReentrant onlyOwner {
         require (IEigenLayerDelegationManager(_eigenLayerDelegationManager).paused() == false, "Delegation Manager Paused");
 
-        _eignelayerOperator = operator_;
+        ISignatureUtils.SignatureWithExpiry memory emptySig;
+        emptySig.signature = "";
+        emptySig.expiry = 0;
 
-        IEigenLayerDelegationManager(_eigenLayerDelegationManager).delegateTo(_eignelayerOperator);
+        IEigenLayerDelegationManager(_eigenLayerDelegationManager).delegateTo(operator_, emptySig, "");
+
+        _eignelayerOperator = operator_;
     }
 
     function _depositIntoStrategy() internal nonReentrant returns (uint256 shares){
