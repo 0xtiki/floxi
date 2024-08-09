@@ -105,6 +105,12 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     uint256 private _reservedAssets;
     uint256 private _withdrawQueueNonce;
 
+    struct QP {
+    address[] strategies;
+    uint256[] shares;
+    address withdrawer;
+}
+
     function asset() public view returns (address) {
         return address(_asset);
     }
@@ -171,79 +177,97 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         return shares;
     }
 
-    // POC, can be batched on l2 and triggered by cross domain messenger
-    function initiateEigenlayerWithdrawal(uint256 shares_) external nonReentrant onlyOwner {
+    // POC, should receive shares as input and generate IDelegationManager.QueuedWithdrawalParams[] but not enough time to debug
+    // Taking calldata from ethers for now
+    function initiateEigenlayerWithdrawal(bytes calldata calldata_) external nonReentrant onlyOwner {
 
-        IStrategy[] memory strategies = new IStrategy[](1);
-        uint256[] memory shares = new uint256[](1);
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+        (bool success, bytes memory result) = address(_eigenLayerDelegationManager).call(calldata_);
+        require(success, "External call failed");
 
-        queuedWithdrawalParams[0] = IDelegationManager.QueuedWithdrawalParams ({
-            strategies: strategies,
-            shares: shares,
-            withdrawer: address(this)
-        });
-
-        queuedWithdrawalParams[0].strategies[0] = _eigenLayerStrategy;
-        queuedWithdrawalParams[0].shares[0] = shares_;
-
-        console.log(address(queuedWithdrawalParams[0].strategies[0]));
-        console.log(queuedWithdrawalParams[0].shares[0]);
-
-        console.log(_eigenLayerDelegationManager.delegatedTo(address(this)));
-
-        console.log(1);
-
-        console.log(queuedWithdrawalParams.length);
-
-        console.log(queuedWithdrawalParams[0].strategies.length == queuedWithdrawalParams[0].shares.length);
-
-        console.log(queuedWithdrawalParams[0].withdrawer == msg.sender);
-
-        console.log(A(0x8CA7A5d6f3acd3A7A8bC468a8CD0FB14B6BD28b6).shares(address(this)));
-
-        bytes32[] memory withdrawalRoots = _eigenLayerDelegationManager.queueWithdrawals(queuedWithdrawalParams);
+        bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
 
         bytes32 withdrawalId = keccak256(abi.encodePacked(msg.sender, _withdrawQueueNonce));
 
+        bytes calldata data = calldata_[4:];
+
+        QP[] memory params = abi.decode(data, (QP[]));
+
         emit WithdrawalQueued(
             withdrawalId,
-            msg.sender,
             address(this),
+            params[0].withdrawer,
             _withdrawQueueNonce,
             block.number,
             address(_eigenLayerStrategy),
-            shares_,
+            params[0].shares[0],
             withdrawalRoots[0]
         );
 
         _withdrawQueueNonce += 1;
+
+        // QP[] memory params2[0] = 
+        // // Declare and initialize strategies array
+        // address[] memory strategies = new address[](1);
+        // strategies[0] = address(_eigenLayerStrategy);
+
+        // // Declare and initialize shares array
+        // uint256[] memory shares = new uint256[](1);
+        // shares[0] = shares_;
+
+        // // Declare and initialize queuedWithdrawalParams array
+        // IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+
+        // // Initialize the first element of the struct array
+        // queuedWithdrawalParams[0] = IDelegationManager.QueuedWithdrawalParams({
+        //     strategies: strategies,
+        //     shares: shares,
+        //     withdrawer: address(this)
+        // });
+
+        // // Encode the calldata
+        // bytes memory dta = abi.encodeWithSignature(
+        //     "queueWithdrawals((address[],uint256[],address)[])",
+        //     queuedWithdrawalParams
+        // );
+
+        // console.logBytes(dta);
+
+
+        // bytes memory dta = abi.encodeWithSignature(
+        //     "queueWithdrawals((address[],uint256[],address)[])",
+        //     queuedWithdrawalParams
+        // );
+
+        // console.logBytes(dta);
+
+        // (bool success, bytes memory result) = address(_eigenLayerDelegationManager).call(
+        //     hex"0dd8dd02000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000e5b6f5e695ba6e4aed92b68c4cc8df1160d69a8100000000000000000000000000000000000000000000000000000000000000010000000000000000000000008ca7a5d6f3acd3a7a8bc468a8cd0fb14b6bd28b600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e80000"
+        // );
+        // require(success, "External call failed");
+
+        // bytes32[] memory withdrawalRoots = new bytes32[](1);
+
+        // bytes32[] memory withdrawalRoots = _eigenLayerDelegationManager.queueWithdrawals(queuedWithdrawalParams);
     }
     
-    // function completeEigenlayerWithdrawal(uint256 shares) external {
+    function completeEigenlayerWithdrawal(IDelegationManager.Withdrawal calldata withdrawal) external {
 
-    //     // Complete the withdrawal
-    //     IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
-    //         staker: address(this),
-    //         withdrawer: address(this),
-    //         strategies: [_eigenLayerStrategy],
-    //         shares: [shares]
-    //     });
+        IERC20[] memory assets = new IERC20[](1);
+        assets[0] = _asset;
 
-    //     _eigenLayerDelegationManager.completeQueuedWithdrawal(
-    //         withdrawal,
-    //         [_asset],
-    //         0, // uint256 middlewareTimesIndex,
-    //         true // bool receiveAsTokens
-    //     );
-    // }
+        _eigenLayerDelegationManager.completeQueuedWithdrawal(
+            withdrawal,
+            assets,
+            0, // uint256 middlewareTimesIndex,
+            true // bool receiveAsTokens
+        );
+    }
 
     // will be done by keeper
     function initiateBridgeWithdrawal(uint256 shares) external nonReentrant onlyOwner{
         // TBD
     }
 
-    // will be done by keeper in production
     // function finalizeErc20Bridgel(
     //     uint256 _amount
     //     // bytes calldata _extraData

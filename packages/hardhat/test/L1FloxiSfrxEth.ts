@@ -5,6 +5,7 @@ import { Contract } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { L1FloxiSfrxEth } from "../typechain-types/contracts/L1FloxiSfrxEth.sol";
 import { IERC20 } from "../typechain-types";
+import delegationManagerAbi from "./delegationManagerAbi.json";
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const L2_sfrxEth = "0xFC00000000000000000000000000000000000005";
@@ -41,6 +42,7 @@ describe("L1Floxi", function () {
   let contract: L1FloxiSfrxEth;
   let owner: HardhatEthersSigner;
   let treasury: HardhatEthersSigner;
+  let withdrawalEventData: any;
 
   before(async () => {
     resetFork();
@@ -86,18 +88,6 @@ describe("L1Floxi", function () {
       "function delegation() external view returns (address)",
     ];
     eigenStrategyMan = new ethers.Contract(eigenlayerStrategyManager, strategyManagerAbi, owner);
-
-    const delegationManagerAbi = [
-      "function isDelegated(address) external view returns (bool)",
-      "function delegatedTo(address) external view returns (address)",
-      "function isOperator(address) external view returns (bool)",
-      "function delegateTo(address operato, (bytes signature, uint256 expiry) approverSignatureAndExpiry, bytes32 approverSaltr) external",
-      "function paused() view returns (bool)",
-      "function queueWithdrawals((address withdrawer, address[] strategies, uint256[] shares)[] queuedWithdrawalParams) external returns (bytes32[] withdrawalRoots)",
-      "function completeQueuedWithdrawal((address staker, address delegatedTo, address withdrawer, uint256 nonce, uint32 startBlock, address[] strategies, uint256[] shares) withdrawal, address[] tokens, uint256 middlewareTimesIndex, bool receiveAsTokens) external",
-      "function completeQueuedWithdrawals((address staker, address delegatedTo, address withdrawer, uint256 nonce, uint32 startBlock, address[] strategies, uint256[] shares)[] withdrawals, address[][] tokens, uint256[] middlewareTimesIndexes, bool[] receiveAsTokens) external",
-      "function undelegate(address staker) external returns (bytes32[] memory withdrawalRoots)",
-    ];
 
     eigenDelegationMan = new ethers.Contract(eigenLayerDelegationManager, delegationManagerAbi, owner);
 
@@ -152,80 +142,221 @@ describe("L1Floxi", function () {
       expect(await eigenDelegationMan.delegatedTo(contractAddress)).to.equal(eigenYields);
     });
 
-    it("should queue withdrawal", async function () {
-      // const queueTx = await contract.connect(owner).initiateEigenlayerWithdrawal(ethers.parseEther("5"));
-      // await queueTx.wait();
-
-      // eigenStrategyMan.connect(signer);
-
-      console.log(1);
-
-      // sfrxEth.connect(signer);
-
-      // const spender = eigenStrategyMan.address;
+    xit("should undelegate and emit event (direct eigenlayer)", async function () {
+      eigenStrategyMan.connect(signer);
+      await sfrxEth.transfer(owner.address, ethers.parseEther("10"));
       const allowTx = await (sfrxEth as unknown as IERC20)
-        .connect(signer)
-        .approve(eigenlayerStrategyManager, ethers.parseEther("2"));
+        .connect(owner)
+        .approve(eigenlayerStrategyManager, ethers.parseEther("10"));
       await allowTx.wait();
 
-      console.log(2);
-
-      console.log(await (sfrxEth as unknown as IERC20).allowance(signer.address.toString(), eigenlayerStrategyManager));
-
-      const depositTx = await eigenStrategyMan
-        .connect(owner)
-        .depositIntoStrategy(eigenLayerStrategy, sfrxEthEthereumMainnet, ethers.parseEther("1"));
+      const depositTx = await eigenStrategyMan.depositIntoStrategy(
+        eigenLayerStrategy,
+        sfrxEthEthereumMainnet,
+        ethers.parseEther("10"),
+      );
 
       await depositTx.wait();
 
-      console.log(await eigenStrategyMan.stakerStrategyShares(signer.address, eigenLayerStrategy));
-
-      const delegatetTx = await eigenDelegationMan.delegatedTo(signer.address);
+      const delegatetTx = await eigenDelegationMan.delegateTo(
+        eigenYields,
+        [ethers.ZeroHash, ethers.toBigInt(0)],
+        ethers.ZeroHash,
+      );
 
       await delegatetTx.wait();
 
-      console.log(await eigenDelegationMan.delegatedTo(signer.address));
+      const queueTx = await eigenDelegationMan.undelegate(owner.address);
+
+      const receipt = await queueTx.wait();
+
+      const eventSignature = "StakerUndelegated(address,address)";
+
+      const eventTopic = ethers.id(eventSignature);
+
+      const event = receipt.logs.find((log: any) => log.topics[0] === eventTopic);
+
+      if (event) {
+        const staker = ethers.AbiCoder.defaultAbiCoder().decode(["address"], event.topics[1]);
+        const operator = ethers.AbiCoder.defaultAbiCoder().decode(["address"], event.topics[2]);
+
+        expect(staker[0]).to.equal(owner.address);
+        expect(operator[0]).to.equal(eigenYields);
+      }
+
+      expect(event).to.not.be.undefined;
+    });
+
+    xit("should queue withdrawal and emit event (direct eigenlayer)", async function () {
+      eigenStrategyMan.connect(signer);
+      await sfrxEth.transfer(owner.address, ethers.parseEther("10"));
+      const allowTx = await (sfrxEth as unknown as IERC20)
+        .connect(owner)
+        .approve(eigenlayerStrategyManager, ethers.parseEther("10"));
+      await allowTx.wait();
+
+      const depositTx = await eigenStrategyMan.depositIntoStrategy(
+        eigenLayerStrategy,
+        sfrxEthEthereumMainnet,
+        ethers.parseEther("10"),
+      );
+
+      await depositTx.wait();
+
+      const delegatetTx = await eigenDelegationMan.delegateTo(
+        eigenYields,
+        [ethers.ZeroHash, ethers.toBigInt(0)],
+        ethers.ZeroHash,
+      );
+
+      await delegatetTx.wait();
 
       const queuedWithdrawalParams = [];
       queuedWithdrawalParams[0] = {
         strategies: [eigenLayerStrategy],
         shares: [ethers.parseEther("10")],
-        withdrawer: signer.address,
+        withdrawer: owner.address,
       };
 
-      const queueTx = await eigenDelegationMan.undelegate(signer.address);
+      const startBlock = await ethers.provider.getBlockNumber();
+
+      const queueTx = await eigenDelegationMan.queueWithdrawals(queuedWithdrawalParams);
 
       const receipt = await queueTx.wait();
 
-      console.log(receipt);
+      const eventSignature = "WithdrawalQueued(bytes32,(address,address,address,uint256,uint32,address[],uint256[]))";
 
-      // const queueTx = await eigenDelegationMan.queueWithdrawals(queuedWithdrawalParams);
+      const eventTopic = ethers.id(eventSignature);
 
-      // const receipt = await queueTx.wait();
+      const event = receipt.logs.find((log: any) => log.topics[0] === eventTopic);
 
-      // console.log(receipt);
+      if (event) {
+        const [withdrawalRoot, withdrawal] = ethers.AbiCoder.defaultAbiCoder().decode(
+          ["bytes32", "tuple(address,address,address,uint256,uint32,address[],uint256[])"],
+          event.data,
+        );
 
-      // await expect(await contract.connect(owner).initiateEigenlayerWithdrawal(ethers.parseEther("10")))
-      // .to.emit(contract, "WithdrawalQueued")
-      // .withArgs(42, "foo");
+        console.log(withdrawalRoot);
+
+        // struct Withdrawal {
+        //     address staker;
+        //     address delegatedTo;
+        //     address withdrawer;
+        //     uint256 nonce;
+        //     uint32 startBlock;
+        //     IStrategy[] strategies;
+        //     uint256[] shares;
+        // }
+
+        expect(withdrawal[0], "e1").to.equal(owner.address);
+        expect(withdrawal[1], "e2").to.equal(eigenYields);
+        expect(withdrawal[2], "e3").to.equal(owner.address);
+        expect(withdrawal[3], "e4").to.equal(ethers.toBigInt("1"));
+        expect(withdrawal[4], "e5").to.equal(startBlock + 1);
+        expect(withdrawal[5][0], "e6").to.equal(eigenLayerStrategy);
+        expect(withdrawal[6][0], "e7").to.equal(ethers.parseEther("10"));
+
+        // expect(withdrawal.withdrawer).to.equal(owner.address);
+      }
+
+      expect(event).to.not.be.undefined;
     });
 
-    // contract.on("WithdrawalQueued", (withdrawalId, staker, withdrawer, nonce, startBlock, strategy, shares, withdrawalRoot) => {
-    //   console.log(`withdrawalId: ${withdrawalId}`);
-    //   console.log(`staker: ${staker}`);
-    //   console.log(`withdrawer: ${withdrawer}`);
-    //   console.log(`nonce: ${nonce}`);
-    //   console.log(`startBlock: ${startBlock}`);
-    //   console.log(`strategy: ${strategy}`);
-    //   console.log(`shares: ${shares}`);
-    //   console.log(`withdrawalRoot: ${withdrawalRoot}`);
-    // });
+    xit("should log calldata", async function () {
+      // const contractAddy = await contract.getAddress();
+      // console.log(contractAddy)
+
+      const queuedWithdrawalParams = [];
+      queuedWithdrawalParams[0] = {
+        strategies: [eigenLayerStrategy],
+        shares: [ethers.parseEther("10")],
+        withdrawer: await contract.getAddress(),
+      };
+
+      const iface = new ethers.Interface(delegationManagerAbi);
+      // console.log(iface.fragments.find(fragment => (fragment as FunctionFragment).name === "queueWithdrawals")?.inputs[0].arrayChildren?.components)
+      const calldata = iface.encodeFunctionData("queueWithdrawals", [queuedWithdrawalParams]);
+      console.log(calldata);
+    });
 
     it("should set claimer", async function () {
       const contractAddress = await contract.getAddress();
       const claimerTx = await contract.connect(owner).setClaimer(owner);
       await claimerTx.wait();
       expect(await eigenRewardsCoord.claimerFor(contractAddress)).to.equal(owner.address);
+    });
+
+    it("should initiate withdrawal and emit event (floxi)", async function () {
+      const contractAddress = await contract.getAddress();
+
+      const queuedWithdrawalParams = [];
+      queuedWithdrawalParams[0] = {
+        strategies: [eigenLayerStrategy],
+        shares: [ethers.parseEther("10")],
+        withdrawer: contractAddress,
+      };
+
+      const iface = new ethers.Interface(delegationManagerAbi);
+      const calldata = iface.encodeFunctionData("queueWithdrawals", [queuedWithdrawalParams]);
+
+      const startBlock = await ethers.provider.getBlockNumber();
+
+      const queueTx = await contract.connect(owner).initiateEigenlayerWithdrawal(calldata);
+      const receipt = await queueTx.wait();
+
+      const eventSignature = "WithdrawalQueued(bytes32,(address,address,address,uint256,uint32,address[],uint256[]))";
+      const eventTopic = ethers.id(eventSignature);
+      const event = receipt?.logs.find((log: any) => log.topics[0] === eventTopic);
+
+      if (event) {
+        const [withdrawalRoot, withdrawal] = ethers.AbiCoder.defaultAbiCoder().decode(
+          ["bytes32", "tuple(address,address,address,uint256,uint32,address[],uint256[])"],
+          event.data,
+        );
+
+        console.log(withdrawalRoot);
+
+        // struct Withdrawal {
+        //     address staker;
+        //     address delegatedTo;
+        //     address withdrawer;
+        //     uint256 nonce;
+        //     uint32 startBlock;
+        //     IStrategy[] strategies;
+        //     uint256[] shares;
+        // }
+
+        expect(withdrawal[0], "e1").to.equal(contractAddress);
+        expect(withdrawal[1], "e2").to.equal(eigenYields);
+        expect(withdrawal[2], "e3").to.equal(contractAddress);
+        expect(withdrawal[3], "e4").to.equal(ethers.toBigInt("0"));
+        expect(withdrawal[4], "e5").to.equal(startBlock + 1);
+        expect(withdrawal[5][0], "e6").to.equal(eigenLayerStrategy);
+        expect(withdrawal[6][0], "e7").to.equal(ethers.parseEther("10"));
+
+        withdrawalEventData = withdrawal;
+      }
+      expect(event).to.not.be.undefined;
+    });
+
+    it("should finalize Withdrawal and emit event (floxi)", async function () {
+      await hre.network.provider.send("hardhat_mine", ["0xffffffffff"]);
+
+      // set during previous test
+      const withdrawal: any = {};
+
+      withdrawal.staker = withdrawalEventData[0];
+      withdrawal.delegatedTo = withdrawalEventData[1];
+      withdrawal.withdrawer = withdrawalEventData[2];
+      withdrawal.nonce = withdrawalEventData[3];
+      withdrawal.startBlock = withdrawalEventData[4];
+      withdrawal.strategies = [withdrawalEventData[5][0]];
+      withdrawal.shares = [withdrawalEventData[6][0]];
+
+      const queueTx = await contract.connect(owner).completeEigenlayerWithdrawal(withdrawal);
+      const receipt = await queueTx.wait();
+
+      console.log(receipt);
     });
 
     xit("should revert on deposit on L1floxi", async function () {
