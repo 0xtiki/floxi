@@ -6,6 +6,10 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { L1FloxiSfrxEth } from "../typechain-types/contracts/L1FloxiSfrxEth.sol";
 import { IERC20 } from "../typechain-types";
 import delegationManagerAbi from "./delegationManagerAbi.json";
+import constants from "../constants";
+
+// const fraxtal = constants.fraxtal;
+const mainnet = constants.mainnet;
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const L2_sfrxEth = "0xFC00000000000000000000000000000000000005";
@@ -18,6 +22,7 @@ const FORK_BLOCK = 20476083; // mainnet
 const ethereumMainnetRPC = `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`;
 const eigenYields = "0x5ACCC90436492F24E6aF278569691e2c942A676d";
 const eigenLayerRewardsCoordinator = "0x7750d328b314EfFa365A0402CcfD489B80B0adda";
+// const floxiL2 = "0x0000000000000000000000000000000000000001";
 
 const resetFork = async () => {
   await hre.network.provider.request({
@@ -55,8 +60,7 @@ describe("L1Floxi", function () {
     contract = await contractFactory.deploy(
       sfrxEthEthereumMainnet,
       L2_sfrxEth,
-      "0x0000000000000000000000000000000000000001",
-      "0x0000000000000000000000000000000000000001",
+      mainnet.l1StandardBridge,
       eigenlayerStrategyManager,
       eigenLayerStrategy,
       eigenLayerDelegationManager,
@@ -130,7 +134,7 @@ describe("L1Floxi", function () {
       expect(await eigenStrategyMan.stakerStrategyShares(contractAddress, eigenLayerStrategy)).to.equal(
         ethers.parseEther("10"),
       );
-      expect(await contract.assetsInStrategy()).to.equal(ethers.parseEther("10"));
+      expect(await contract.totalStakedAssets()).to.equal(ethers.parseEther("10"));
       expect(await contract.totalAssets()).to.equal(ethers.parseEther("10"));
     });
 
@@ -354,9 +358,18 @@ describe("L1Floxi", function () {
       withdrawal.shares = [withdrawalEventData[6][0]];
 
       const queueTx = await contract.connect(owner).completeEigenlayerWithdrawal(withdrawal);
-      const receipt = await queueTx.wait();
+      await queueTx.wait();
 
-      console.log(receipt);
+      // console.log(receipt);
+    });
+
+    it("should revert if L2 contract is not set", async function () {
+      await expect(contract.connect(owner).shipToL2()).to.be.revertedWith("Remote Contract not set");
+    });
+
+    it("should succeed if L2 contract is set", async function () {
+      await contract.connect(owner).setRemoteContract("0x0000000000000000000000000000000000000001");
+      await expect(contract.connect(owner).shipToL2()).to.not.be.reverted;
     });
 
     xit("should revert on deposit on L1floxi", async function () {

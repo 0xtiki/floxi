@@ -4,20 +4,14 @@ pragma solidity 0.8.20;
 
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 // import "hardhat/console.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
-interface IL2StandardBridge {
-    function bridgeERC20To(
-        address _localToken,
-        address _remoteToken,
-        address __to,
-        uint256 _amount,
-        uint32 _minGasLimit,
-        bytes calldata _extraData
-    ) external;
+interface IFraxFerry {
+    function embarkWithRecipient(uint amount, address recipient) external;
 
     function paused() external view returns (bool);
 }
@@ -27,8 +21,25 @@ interface IL2StandardBridge {
  * @dev ERC4626 vault that handles deposits, minting, and bridging of ERC20 tokens to another chain.
  *  Fees expressed in basis points (bp).
  */
-contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
+contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     using Math for uint256;
+
+    event AssetsShippedToL1(
+        address indexed receiver,
+        uint256 assets
+    );
+
+    event WithdrawalQueued(
+        address indexed account,
+        uint256 indexed nonce,
+        uint256 assets
+    );
+
+    event WithdrawalsUnlocked(
+        uint256 indexed assetsUnlocked,
+        uint256 fromNonce,
+        uint256 toNonce
+    );
 
     // === Constants and immutables ===
 
@@ -45,10 +56,10 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
     address private immutable _treasury;
 
     // Address of the L2 Standard Bridge proxy
-    address private immutable _l2StandardBridgeProxy;
+    // address private immutable _l2StandardBridgeProxy;
 
-    // Function selector for the L1 deposit function (on remote Floxi vault contract)
-    bytes4 private immutable _l1Selector;
+    // FraxFerry V2 Fraxtal https://github.com/FraxFinance/frax-solidity/blob/master/src/types/constants.ts#L4341C60-L4341C102
+    address private immutable _fraxFerry;
 
     // Scale for basis point calculations
     uint256 private constant _BASIS_POINT_SCALE = 1e4;
@@ -65,23 +76,27 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
     // Placeholder, will be defined more appropriately in production (probably adding a batcher at some point)
     uint256 private constant _MIN_DEPOSIT = 1000000000000000; // 0.001 ether
 
+    uint256 private constant _MAX_QUEUED_WITHDRAWALS = 5;
+
+
     constructor(
         IERC20 asset_,
         address remoteAsset_,
         address remoteContract_,
         address treasury_,
-        address l2StandardBridgeProxy_,
-        bytes4 l1Selector_
+        // address l2StandardBridgeProxy_,
+        address fraxFerry_
     )
         ERC20("Floxi Staked Frax ETH", "fsfrxEth")
         ERC4626(asset_)
+        Ownable(msg.sender)
     {
         _asset = asset_;
         _remoteAsset = remoteAsset_;
         _remoteContract = remoteContract_;
         _treasury = treasury_;
-        _l2StandardBridgeProxy = l2StandardBridgeProxy_;
-        _l1Selector = l1Selector_;
+        // _l2StandardBridgeProxy = l2StandardBridgeProxy_;
+        _fraxFerry = fraxFerry_;
     }
 
     // === Variables ===
@@ -89,32 +104,21 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
     // Tracks assets on L1
     uint256 private _l1Assets = 0;
 
-    // === Overrides ===
+    DoubleEndedQueue.Bytes32Deque private _withdrawalQueue;
 
-    /// @dev Make more resistant against inflation attacks by overriding default offset
-    // function _decimalsOffset() internal pure override returns (uint8) {
-    //     return 10;
-    // }
+    mapping(address account => uint256) private _unlockedAssets;
 
-    /**
-     * @dev Preview taking an entry fee on deposit. Overrides {IERC4626-previewDeposit}.
-     * @param assets The amount of assets to deposit.
-     * @return The number of shares corresponding to the deposited assets after fees.
-     */
-    function previewDeposit(uint256 assets) public view virtual override returns (uint256) {
-        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
-        return super.previewDeposit(assets - fee);
-    }
+    mapping(address account => uint256) private _queuedAssets;
 
-    /**
-     * @dev Preview adding an entry fee on mint. Overrides {IERC4626-previewMint}.
-     * @param shares The number of shares to mint.
-     * @return The number of assets required to mint the shares, including fees.
-     */
-    function previewMint(uint256 shares) public view virtual override returns (uint256) {
-        uint256 assets = super.previewMint(shares);
-        return assets + _feeOnRaw(assets, _entryFeeBasisPoints());
-    }
+    mapping(bytes32 id => uint256) private _queuedWithdrawals;
+
+    mapping(address account => uint256) private _activeWithdrawalsCount;
+
+    // uint256 private _reservedAssets;
+
+    uint256 private _withdrawalNonce;
+
+    uint256 private _unlockNonce;
 
     /**
      * @dev Handles deposits into the vault, charges an entry fee, and bridges assets to L1.
@@ -127,54 +131,129 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
 
         require (assets > _MIN_DEPOSIT, "Minimum deposit amount not met");
 
-        require (IL2StandardBridge(_l2StandardBridgeProxy).paused() == false);
+        require (IFraxFerry(_fraxFerry).paused() == false);
 
         uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
         address recipient = _entryFeeRecipient();
 
         super._deposit(caller, receiver, assets, shares);
 
+        uint256 feeInclusive = assets - fee;
+
         if (fee > 0 && recipient != address(this)) {
-            SafeERC20.safeTransfer(IERC20(asset()), recipient, fee);
+            _asset.transfer(recipient, fee);
         }
 
-        // bytes memory extraData = abi.encodeWithSelector(
-        //     _l1Selector,
-        //     assets - fee,
-        //     _remoteContract
-        // );
+        shipToL1(feeInclusive);
+    }
 
-        try IL2StandardBridge(_l2StandardBridgeProxy).bridgeERC20To(
-            address(_asset),
-            _remoteAsset,
-            _remoteContract,
-            assets - fee,
-            120000,
-            ""
-        ) {
-            _l1Assets += assets - fee;
-        } catch {
-                revert("Bridge transfer failed");
+    function shipToL1(uint256 assets) internal {
+
+        bool success = _asset.approve(_fraxFerry, assets + _asset.allowance(address(this), _fraxFerry));
+
+        require(success, "Approval failed");
+
+        try IFraxFerry(_fraxFerry).embarkWithRecipient(assets, _remoteContract) {
+             _l1Assets += assets;
+
+            emit AssetsShippedToL1(
+                _remoteContract,
+                assets
+            );
+        }
+        catch {
+            revert("Failed to bridge assets");
         }
     }
 
-    // /// @dev Send exit fee to {_exitFeeRecipient}. See {IERC4626-_deposit}.
-    // function _withdraw(
-    //     address caller,
-    //     address receiver,
-    //     address owner,
-    //     uint256 assets,
-    //     uint256 shares
-    // ) internal virtual override {
-    //     uint256 fee = _feeOnRaw(assets, _exitFeeBasisPoints());
-    //     address recipient = _exitFeeRecipient();
+    // keeper in case of cancelled ferry or dust (ferry does some rounding on amount)
+    function forceShipToL1(uint256 assets) public onlyOwner {
+        shipToL1(assets);
+    }
 
-    //     super._withdraw(caller, receiver, owner, assets, shares);
+    function queueWithdrawal(uint256 assets) public returns (uint256) {
+        uint256 maxAssets = maxWithdraw(msg.sender) - _queuedAssets[msg.sender];
 
-    //     if (fee > 0 && recipient != address(this)) {
-    //         SafeERC20.safeTransfer(IERC20(asset()), recipient, fee);
-    //     }
-    // }
+        require(assets > maxAssets, "requested withdrawal exceeds balance");
+
+        require(_activeWithdrawalsCount[msg.sender] < _MAX_QUEUED_WITHDRAWALS);
+
+        bytes32 addressToBytes32 = bytes32(uint256(uint160(msg.sender)));
+
+        DoubleEndedQueue.pushBack(_withdrawalQueue, addressToBytes32);
+
+        bytes32 uniqueId = keccak256(abi.encode(msg.sender, _withdrawalNonce));
+
+        _queuedWithdrawals[uniqueId] = assets;
+
+        _queuedAssets[msg.sender] += assets;
+
+        _activeWithdrawalsCount[msg.sender] += 1;
+
+        emit WithdrawalQueued(
+            msg.sender,
+            _withdrawalNonce,
+            assets
+        );
+
+        _withdrawalNonce += 1;
+
+        return assets;
+    }
+
+    // only xDomainMessenger from remoteContract
+    function unlockWithdrawals(uint256 assets, uint256 maxIterations) external onlyOwner {
+        uint256 iterations = 0;
+        uint256 availableAssets = _asset.balanceOf(address(this));
+        uint256 unlockFrom = _unlockNonce;
+        uint256 totalUnlockedAssets;
+
+        for (uint256 i = 0; i < availableAssets && iterations < maxIterations;) {
+
+            if (DoubleEndedQueue.empty(_withdrawalQueue)) {
+                break;
+            }
+
+            bytes32 withdrawer = DoubleEndedQueue.popFront(_withdrawalQueue);
+
+            address bytes32ToAddress = address(uint160(uint256(withdrawer)));
+
+            bytes32 uniqueId = keccak256(abi.encode(bytes32ToAddress, _unlockNonce));
+
+            assets = _queuedWithdrawals[uniqueId];
+
+            _unlockedAssets[bytes32ToAddress] += assets;
+
+            totalUnlockedAssets += assets;
+
+            _queuedAssets[bytes32ToAddress] -= assets;
+
+            _unlockNonce += 1;
+
+            i += assets;
+
+            iterations += 1;
+        }
+
+        uint256 unlockTo = _unlockNonce;
+
+        emit WithdrawalsUnlocked(
+            totalUnlockedAssets,
+            unlockFrom,
+            unlockTo
+        );
+    }
+
+    modifier onlyUnlocked(uint256 assets) {
+        require(_unlockedAssets[msg.sender] >= assets, "Not enough assets unlocked for withdrawal");
+        _;
+    }
+
+    function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares ) internal override onlyUnlocked(assets) {
+        _unlockedAssets[msg.sender] -= assets;
+        
+        super._withdraw(caller, receiver, owner, assets, shares);
+    }
 
     /**
      * @dev Overrides {IERC4626-totalAssets} to include assets on L1.
@@ -221,6 +300,27 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard {
         uint256 gasPriceWei = gasPriceGwei * _WEI_PER_GWEI;
         uint256 totalFee = _L1_GAS_ESTIMATE * gasPriceWei;
         return totalFee;
+    }
+
+
+    /**
+     * @dev Preview taking an entry fee on deposit. Overrides {IERC4626-previewDeposit}.
+     * @param assets The amount of assets to deposit.
+     * @return The number of shares corresponding to the deposited assets after fees.
+     */
+    function previewDeposit(uint256 assets) public view virtual override returns (uint256) {
+        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
+        return super.previewDeposit(assets - fee);
+    }
+
+    /**
+     * @dev Preview adding an entry fee on mint. Overrides {IERC4626-previewMint}.
+     * @param shares The number of shares to mint.
+     * @return The number of assets required to mint the shares, including fees.
+     */
+    function previewMint(uint256 shares) public view virtual override returns (uint256) {
+        uint256 assets = super.previewMint(shares);
+        return assets + _feeOnRaw(assets, _entryFeeBasisPoints());
     }
 
     /**

@@ -5,15 +5,21 @@ import { Contract } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { FloxiSfrxEth } from "../typechain-types/contracts/FloxiSfrxEth.sol";
 import { IERC20 } from "../typechain-types";
+// import constants from "../constants";
+
+// const fraxtal = constants.fraxtal;
+// const mainnet = constants.mainnet;
 
 const ADDR_sfrxEth = "0xFC00000000000000000000000000000000000005";
 // const sFrxEthHoleskyMain = "0xa63f56985F9C7F3bc9fFc5685535649e0C1a55f3";
 const sfrxEthEthereumMainnet = "0xac3E018457B222d93114458476f3E3416Abbe38F";
 const bigSFraxHolderFraxtal = "0x66d9AF69E6845E8666f355676a267a726c04Ea4e";
-const l2StandardBridge = "0x4200000000000000000000000000000000000010";
+// const l2StandardBridge = "0x4200000000000000000000000000000000000010";
 const floxiMainnet = "0x0000000000000000000000000000000000000000";
 const FORK_BLOCK = 7891572;
 const fraxtalMainnetRPC = "https://rpc.frax.com";
+// "https://github.com/FraxFinance/frax-solidity/blob/master/src/types/constants.ts#L4341C60-L4341C102"
+const fraxferry = "0x67c6A8A715fc726ffD0A40588701813d9eC04d9C";
 
 const resetFork = async () => {
   await hre.network.provider.request({
@@ -29,14 +35,13 @@ const resetFork = async () => {
   });
 };
 
-xdescribe("Floxi", function () {
+describe("Floxi", function () {
   let sfrxEth: Contract;
   let signer: HardhatEthersSigner;
   let contract: FloxiSfrxEth;
   let owner: HardhatEthersSigner;
   let treasury: HardhatEthersSigner;
   let entryFee: bigint;
-  let selector: string;
 
   before(async () => {
     resetFork();
@@ -44,8 +49,8 @@ xdescribe("Floxi", function () {
     // get test account with eth
     [owner, treasury] = await hre.ethers.getSigners();
 
-    const functionSignature = "_deposit(address,uint256,uint256)";
-    selector = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
+    // const functionSignature = "_deposit(address,uint256,uint256)";
+    // selector = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
 
     // deploy fsfrxEth
     const contractFactory = await ethers.getContractFactory("FloxiSfrxEth");
@@ -54,8 +59,7 @@ xdescribe("Floxi", function () {
       sfrxEthEthereumMainnet,
       floxiMainnet,
       treasury.address,
-      l2StandardBridge,
-      selector,
+      fraxferry,
     );
     await contract.waitForDeployment();
 
@@ -157,8 +161,8 @@ xdescribe("Floxi", function () {
         sfrxEthEthereumMainnet,
         floxiMainnet,
         treasury.address,
-        "0x0000000000000000000000000000000000000001",
-        selector,
+        // l2StandardBridge,
+        "0x0000000000000000000000000000000000000000",
       );
       await invalidContract.waitForDeployment();
       await sfrxEth.transfer(owner.address, ethers.parseEther("2"));

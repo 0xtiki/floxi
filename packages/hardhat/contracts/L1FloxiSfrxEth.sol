@@ -1,26 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-// import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-// import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IDelegationManager} from "./IDelegationManager.sol";
 import {IStrategy} from "./IStrategy.sol";
 import "hardhat/console.sol";
 
-interface A {
-  function shares(address user) external returns (uint256);
-}
-
-interface IFraxtalL1StandardBridge {
-    function finalizeERC20Withdrawal(
+interface IL1StandardBridge {
+    function depositERC20To(
         address _l1Token,
         address _l2Token,
-        address _from,
         address _to,
         uint256 _amount,
+        uint32 _minGasLimit,
         bytes calldata _extraData
     )
         external;
@@ -50,34 +44,53 @@ interface IEigenLayerStrategyManager {
  }
  
 contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
-    using SafeERC20 for IERC20;
 
     IERC20 private immutable _asset; // sfraxEth l1
-    address private immutable _l2Asset; // sfraxEth l2
-    address private immutable _remoteContract; // floxi l2
-    // address private immutable _keeperContract;
+    address private immutable _remoteAsset; // sfraxEth l2
     address private immutable _l1StandardBridgeProxy;
     address private immutable _eigenLayerStrategyManager;
     IStrategy private immutable _eigenLayerStrategy;
     IDelegationManager private immutable _eigenLayerDelegationManager;
     address private immutable _eigenLayerRewardsCoordinator;
 
-    event WithdrawalQueued(
+    event AssetsDepositedIntoStrategy(
+        uint256 assets,
+        uint256 shares,
+        address strategy
+    );
+
+    event WithdrawalInitiated(
         bytes32 indexed withdrawalId,
-        address indexed staker,
-        address indexed withdrawer,
-        uint256 nonce,
+        address staker,
+        address withdrawer,
+        uint256 indexed nonce,
         uint256 startBlock,
         address strategy,
         uint256 shares,
-        bytes32 withdrawalRoot
+        uint256 assets,
+        bytes32 indexed withdrawalRoot
     );
+
+    event WithdrawalCompleted(
+        uint256 assets,
+        uint256 shares,
+        address strategy
+    );
+
+    event AssetsShippedToL2(
+        address indexed receiver,
+        uint256 assets
+    );
+
+    struct QueueParams {
+        address[] strategies;
+        uint256[] shares;
+        address withdrawer;
+    }
 
     constructor(
         IERC20 asset_,
-        address l2Asset_,
-        address remoteContract_,
-        // address keeperContract_,
+        address remoteAsset_,
         address l1StandardBridgeProxy_,
         address eigenLayerStrategyManager_,
         address eigenLayerStrategy_,
@@ -87,9 +100,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         Ownable(msg.sender)
     {
         _asset = asset_;
-        _l2Asset = l2Asset_;
-        _remoteContract = remoteContract_;
-        // _keeperContract = keeperContract_;
+        _remoteAsset = remoteAsset_;
         _l1StandardBridgeProxy = l1StandardBridgeProxy_;
         _eigenLayerStrategyManager = eigenLayerStrategyManager_;
         _eigenLayerStrategy = IStrategy(eigenLayerStrategy_);
@@ -98,18 +109,17 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     }
 
     address private _claimer;
-    uint256 private _stakedAssets;
     address private _eignelayerOperator;
-    mapping(address => uint256) private _balances;
-    uint256 private _totalShares;
+    uint256 private _queuedAssets;
     uint256 private _reservedAssets;
     uint256 private _withdrawQueueNonce;
+    uint256 private _bridgeDepositNonce;
+    address private _remoteContract; // floxi l2
 
-    struct QP {
-    address[] strategies;
-    uint256[] shares;
-    address withdrawer;
-}
+    function setRemoteContract(address floxiL2) public onlyOwner {
+        _remoteContract = floxiL2;
+    }
+
 
     function asset() public view returns (address) {
         return address(_asset);
@@ -117,15 +127,27 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
 
     // inclusive of deposited assest
     function totalAssets() public view returns (uint256) {
-        return _asset.balanceOf(address(this)) + _stakedAssets;
+        return _asset.balanceOf(address(this)) + totalStakedAssets();
     }
 
-    function assetsInStrategy() public view returns (uint256) {
-        return _stakedAssets;
+    function queuedAssets() public view returns (uint256) {
+        return _queuedAssets;
     }
 
-    function stratgyShares() public view returns (uint256) {
+    function reservedAssets() public view returns (uint256) {
+        return _reservedAssets;
+    }
+
+    function totalStakedAssets() public view returns (uint256) {
+        return _eigenLayerStrategy.sharesToUnderlyingView(totalShares());
+    }
+
+    function totalShares() public view returns (uint256) {
         return IEigenLayerStrategyManager(_eigenLayerStrategyManager).stakerStrategyShares(address(this), address(_eigenLayerStrategy));
+    }
+
+    function sharesToUnderlying(uint256 shares_) public view returns (uint256) {
+        return _eigenLayerStrategy.sharesToUnderlyingView(shares_);
     }
 
     // called by keeper
@@ -155,7 +177,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         _claimer = claimer_;
     }
 
-    function _depositIntoStrategy() internal nonReentrant returns (uint256 shares) {
+    function _depositIntoStrategy() internal nonReentrant {
         require(IEigenLayerStrategyManager(_eigenLayerStrategyManager).paused() == false, "Strategy Manager Paused");
 
         uint256 balance = _asset.balanceOf(address(this));
@@ -164,22 +186,39 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
 
         uint256 deposit = balance - _reservedAssets;
 
-        _asset.safeIncreaseAllowance(_eigenLayerStrategyManager, deposit);
+        _asset.approve(_eigenLayerStrategyManager, deposit);
 
         require(_asset.allowance(address(this), _eigenLayerStrategyManager) == deposit, "Token approval failed");
 
-        shares = IEigenLayerStrategyManager(_eigenLayerStrategyManager).depositIntoStrategy(address(_eigenLayerStrategy), address(_asset), deposit);
+        uint256 shares = IEigenLayerStrategyManager(_eigenLayerStrategyManager).depositIntoStrategy(address(_eigenLayerStrategy), address(_asset), deposit);
 
         require(shares == deposit, "Strategy deposit failed");
 
-        _stakedAssets += deposit;
-
-        return shares;
+        emit AssetsDepositedIntoStrategy(
+            deposit,
+            shares,
+            address(_eigenLayerStrategy)
+        );
     }
 
     // POC, should receive shares as input and generate IDelegationManager.QueuedWithdrawalParams[] but not enough time to debug
     // Taking calldata from ethers for now
     function initiateEigenlayerWithdrawal(bytes calldata calldata_) external nonReentrant onlyOwner {
+        bytes calldata data = calldata_[4:];
+
+        QueueParams[] memory params = abi.decode(data, (QueueParams[]));
+
+        uint256 shares = params[0].shares[0];
+
+        require(params[0].withdrawer == address(this), "Withdrawer must be this contract");
+
+        require(shares > 0, "Must be bigger than 0");
+
+        require(shares <= IEigenLayerStrategyManager(_eigenLayerStrategyManager).stakerStrategyShares(address(this), address(_eigenLayerStrategy)), "Shares requested too high");
+
+        uint256 assets = _eigenLayerStrategy.sharesToUnderlyingView(shares);
+
+        require(assets > 0);
 
         (bool success, bytes memory result) = address(_eigenLayerDelegationManager).call(calldata_);
         require(success, "External call failed");
@@ -188,104 +227,81 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
 
         bytes32 withdrawalId = keccak256(abi.encodePacked(msg.sender, _withdrawQueueNonce));
 
-        bytes calldata data = calldata_[4:];
-
-        QP[] memory params = abi.decode(data, (QP[]));
-
-        emit WithdrawalQueued(
+        emit WithdrawalInitiated(
             withdrawalId,
             address(this),
             params[0].withdrawer,
             _withdrawQueueNonce,
             block.number,
             address(_eigenLayerStrategy),
-            params[0].shares[0],
+            shares,
+            assets,
             withdrawalRoots[0]
         );
 
         _withdrawQueueNonce += 1;
-
-        // QP[] memory params2[0] = 
-        // // Declare and initialize strategies array
-        // address[] memory strategies = new address[](1);
-        // strategies[0] = address(_eigenLayerStrategy);
-
-        // // Declare and initialize shares array
-        // uint256[] memory shares = new uint256[](1);
-        // shares[0] = shares_;
-
-        // // Declare and initialize queuedWithdrawalParams array
-        // IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
-
-        // // Initialize the first element of the struct array
-        // queuedWithdrawalParams[0] = IDelegationManager.QueuedWithdrawalParams({
-        //     strategies: strategies,
-        //     shares: shares,
-        //     withdrawer: address(this)
-        // });
-
-        // // Encode the calldata
-        // bytes memory dta = abi.encodeWithSignature(
-        //     "queueWithdrawals((address[],uint256[],address)[])",
-        //     queuedWithdrawalParams
-        // );
-
-        // console.logBytes(dta);
-
-
-        // bytes memory dta = abi.encodeWithSignature(
-        //     "queueWithdrawals((address[],uint256[],address)[])",
-        //     queuedWithdrawalParams
-        // );
-
-        // console.logBytes(dta);
-
-        // (bool success, bytes memory result) = address(_eigenLayerDelegationManager).call(
-        //     hex"0dd8dd02000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000e5b6f5e695ba6e4aed92b68c4cc8df1160d69a8100000000000000000000000000000000000000000000000000000000000000010000000000000000000000008ca7a5d6f3acd3a7a8bc468a8cd0fb14b6bd28b600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e80000"
-        // );
-        // require(success, "External call failed");
-
-        // bytes32[] memory withdrawalRoots = new bytes32[](1);
-
-        // bytes32[] memory withdrawalRoots = _eigenLayerDelegationManager.queueWithdrawals(queuedWithdrawalParams);
+        _queuedAssets += assets;
+        
     }
     
-    function completeEigenlayerWithdrawal(IDelegationManager.Withdrawal calldata withdrawal) external {
+    function completeEigenlayerWithdrawal(IDelegationManager.Withdrawal calldata withdrawal) external nonReentrant onlyOwner {
 
-        IERC20[] memory assets = new IERC20[](1);
-        assets[0] = _asset;
+        IERC20[] memory underlying = new IERC20[](1);
+        underlying[0] = _asset;
 
-        _eigenLayerDelegationManager.completeQueuedWithdrawal(
+        uint256 assets = _eigenLayerStrategy.sharesToUnderlyingView(withdrawal.shares[0]);
+
+        try _eigenLayerDelegationManager.completeQueuedWithdrawal(
             withdrawal,
-            assets,
+            underlying,
             0, // uint256 middlewareTimesIndex,
             true // bool receiveAsTokens
+        ) {
+            _queuedAssets -= assets;
+            _reservedAssets += assets;
+        } catch {
+                revert("Complete Withdrawal failed");
+        }
+
+        emit WithdrawalCompleted(
+            assets,
+            withdrawal.shares[0],
+            address(_eigenLayerStrategy)
         );
     }
 
-    // will be done by keeper
-    function initiateBridgeWithdrawal(uint256 shares) external nonReentrant onlyOwner{
-        // TBD
+    function shipToL2() external nonReentrant onlyOwner {
+        require (IL1StandardBridge(_l1StandardBridgeProxy).paused() == false, "Delegation Manager Paused");
+
+        require (_remoteContract != address(0), "Remote Contract not set");
+
+        bytes memory extraData = abi.encode(_bridgeDepositNonce);
+
+        _asset.approve(_l1StandardBridgeProxy, _reservedAssets);
+
+        require(_asset.allowance(address(this), _l1StandardBridgeProxy) == _reservedAssets, "Token approval failed");
+
+        try IL1StandardBridge(_l1StandardBridgeProxy).depositERC20To(
+            address(_asset),
+            _remoteAsset,
+            _remoteContract,
+            _reservedAssets,
+            220000,
+            extraData
+        ) {
+            _reservedAssets = 0;
+        } 
+        catch {
+            revert("Failed to bridge");
+        }
+
+        emit AssetsShippedToL2(
+            _remoteContract,
+            _reservedAssets
+        );
     }
 
-    // function finalizeErc20Bridgel(
-    //     uint256 _amount
-    //     // bytes calldata _extraData
-    // ) external nonReentrant onlyOwner {
+    // function emergencyWithdraw(assets)
 
-    //     require (! IFraxtalL1StandardBridge(_l1StandardBridgeProxy).paused());
 
-    //     try IFraxtalL1StandardBridge(_l1StandardBridgeProxy).finalizeERC20Withdrawal(
-    //         address(_asset),
-    //         _l2Asset,
-    //         _remoteContract,
-    //         address(this),
-    //         _amount,
-    //         "" // _extraData
-    //     ) {
-    //         _depositIntoStrategy();
-    //     } catch {
-    //             revert("Bridge transfer failed");
-    //     }
-    // }
 }
