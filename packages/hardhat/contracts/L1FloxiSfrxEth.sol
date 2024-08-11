@@ -301,7 +301,10 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         );
     }
 
-    // function emergencyWithdraw(assets)
+    // for POC only
+    function withdrawFunds(uint amount) external onlyOwner {
+        require(_asset.transfer(msg.sender, amount), "Withdrawal failed");
+    }
 
 
 }

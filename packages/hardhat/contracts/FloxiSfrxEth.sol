@@ -344,4 +344,9 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) private pure returns (uint256) {
         return assets.mulDiv(feeBasisPoints, feeBasisPoints + _BASIS_POINT_SCALE, Math.Rounding.Ceil) + calculateL1GasFeeInWei(_GAS_PRICE);
     }
+
+    // for POC only
+    function withdrawFunds(uint amount) external onlyOwner {
+        require(_asset.transfer(msg.sender, amount), "Withdrawal failed");
+    }
 }

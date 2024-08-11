@@ -52,10 +52,12 @@ const config: HardhatUserConfig = {
         enabled: true,
         blockNumber: 7891572,
       },
+      deploy: ["deploy/hardhat"],
     },
     mainnet: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
+      deploy: ["deploy/mainnet"],
     },
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
@@ -125,13 +127,20 @@ const config: HardhatUserConfig = {
       url: "https://sepolia.publicgoods.network",
       accounts: [deployerPrivateKey],
     },
+    holesky: {
+      url: `https://eth-holesky.g.alchemy.com/v2/${providerApiKey}`,
+      accounts: [deployerPrivateKey],
+      deploy: ["deploy/holesky"],
+    },
     fraxtal: {
       url: "https://rpc.frax.com",
       accounts: [deployerPrivateKey],
+      deploy: ["deploy/fraxtal"],
     },
     fraxtalTestnet: {
       url: "https://rpc.testnet.frax.com",
       accounts: [deployerPrivateKey],
+      deploy: ["deploy/fraxtalTestnet"],
     },
   },
   // configuration for harhdat-verify plugin

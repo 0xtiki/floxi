@@ -1,0 +1,24 @@
+{
+  "name": "floxi-offchain-service",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./dist/offchain-service/src/index.js",
+    "build": "tsc",
+    "dev": "ts-node index.ts"
+  },
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "~6.7.3",
+    "@typescript-eslint/parser": "~6.7.3",
+    "cron": "^3.1.7",
+    "dotenv": "^16.4.5",
+    "typescript": "^5.5.4",
+    "viem": "^2.19.3"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.0.0"
+  }
+}

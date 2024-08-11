@@ -1,4 +1,4 @@
-const constants = {
+const addresses = {
   mainnet: {
     sfrxEth: "0xac3E018457B222d93114458476f3E3416Abbe38F",
     treasury: process.env.TREASURY_WALLET_ADDRESS,
@@ -39,4 +39,4 @@ const constants = {
   },
 };
 
-export default constants;
+export default addresses;

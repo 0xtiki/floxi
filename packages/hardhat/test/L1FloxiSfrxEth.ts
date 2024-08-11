@@ -6,7 +6,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { L1FloxiSfrxEth } from "../typechain-types/contracts/L1FloxiSfrxEth.sol";
 import { IERC20 } from "../typechain-types";
 import delegationManagerAbi from "./delegationManagerAbi.json";
-import constants from "../constants";
+import constants from "../addresses";
 
 // const fraxtal = constants.fraxtal;
 const mainnet = constants.mainnet;
