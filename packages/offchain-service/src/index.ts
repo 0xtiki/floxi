@@ -3,95 +3,17 @@ import dotenv from 'dotenv';
 import { createPublicClient, createTestClient, createWalletClient, formatEther, http, parseAbiItem, publicActions } from 'viem';
 import { fraxtal, mainnet, fraxtalTestnet, holesky } from 'viem/chains';
 import { CronJob } from 'cron';
-import floxiSfrxEth from '../../hardhat/artifacts/contracts/FloxiSfrxEth.sol/FloxiSfrxEth.json' assert { type: 'json' }
+// import floxiSfrxEth from '../../hardhat/artifacts/contracts/FloxiSfrxEth.sol/FloxiSfrxEth.json' assert { type: 'json' }
 import { privateKeyToAccount } from 'viem/accounts';
+import {getFraxtalClient, getMainnetClient} from './client';
 
-const floxiL2abi = floxiSfrxEth.abi
-const floxiL2bytecode = floxiSfrxEth.bytecode
 
 dotenv.config();
 
-let env = 'testnet';
-// hardhat
-// testnet
-// mainnet
- 
-const fraxtalClient = (() => {
-    if (env === 'hardhat') {
-        return createTestClient({ 
-            chain: fraxtal, 
-            mode: 'hardhat',
-            transport: http('https://rpc.frax.com'), 
-        })
-        .extend(publicActions) 
-    } else if (env === 'mainnet') {
-        return createPublicClient({ 
-            chain: fraxtal, 
-            transport: http('https://rpc.frax.com'), 
-        });
-    } else {
-        return createPublicClient({ 
-            chain: fraxtalTestnet, 
-            transport: http('https://rpc.testnet.frax.com'), 
-        });
-    }
-})();
+const fClient = getFraxtalClient('testnet');
+const mClient = getMainnetClient('testnet');
+const deployer = privateKeyToAccount(`0x${process.env.DEPLOYER_PRIVATE_KEY!.slice(2)}`);
 
-const mainnetClient = (() => {
-    if (env === 'hardhat') {
-        return createTestClient({ 
-            chain: mainnet, 
-            mode: 'hardhat',
-            transport: http(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
-        })
-        .extend(publicActions) 
-    } else if (env === 'mainnet') {
-        return createPublicClient({ 
-            chain: mainnet, 
-            transport: http(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
-        });
-    } else {
-        return createPublicClient({ 
-            chain: holesky, 
-            transport: http('https://rpc.holesky.ethpandaops.io'), 
-        });
-    }
-})();
-
-// const walletClient = createWalletClient({
-//     chain: fraxtalTestnet,
-//     transport: http('https://rpc.testnet.frax.com')
-//     // chain: holesky,
-//     // transport: http('https://rpc.holesky.ethpandaops.io')
-// })
-   
-// const account = privateKeyToAccount(`0x${process.env.DEPLOYER_PRIVATE_KEY!.slice(2)}`);
-
-// const ADDR_sfrxEth = "0xFC00000000000000000000000000000000000005";
-// // const sFrxEthHoleskyMain = "0xa63f56985F9C7F3bc9fFc5685535649e0C1a55f3";
-// const sfrxEthEthereumMainnet = "0xac3E018457B222d93114458476f3E3416Abbe38F";
-// const bigSFraxHolderFraxtal = "0x66d9AF69E6845E8666f355676a267a726c04Ea4e";
-// const l2StandardBridge = "0x4200000000000000000000000000000000000010";
-// const floxiMainnet = "0x0000000000000000000000000000000000000000";
-// const fraxFerryL2 = '0x67c6A8A715fc726ffD0A40588701813d9eC04d9C';
-
-  
-// const hash = await walletClient.deployContract({
-//   abi: floxiL2abi,
-//   account,
-//   args: [
-//     ADDR_sfrxEth,
-//     sfrxEthEthereumMainnet,
-//     floxiMainnet,
-//     account.address,
-//     l2StandardBridge,
-//     fraxFerryL2,
-//   ],
-//   bytecode: `0x${floxiL2bytecode.slice(2)}`,
-// })
-
-// console.log(hash);
-// //0x561f29323f7b34135a63fa39505808c36ba3b8c750424c4fd4d2ed21c8846a06
 
 // const balance = await fraxtalClient.getBalance({
 //     address: account.address,
