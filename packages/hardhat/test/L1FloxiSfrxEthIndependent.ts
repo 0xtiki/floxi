@@ -39,7 +39,7 @@ const resetFork = async () => {
   });
 };
 
-xdescribe("L1Floxi", function () {
+describe("L1Floxi", function () {
   let sfrxEth: Contract;
   let eigenStrategyMan: Contract;
   let eigenDelegationMan: Contract;
