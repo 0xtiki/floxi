@@ -16,12 +16,16 @@ contract FraxFerryMockL1 is Ownable {
 
     event Disembark(uint start, uint end, bytes32 hash);
 
-    function disembark() external onlyOwner {
+    function disembark(bytes32 hash_) external onlyOwner {
         uint256 balance = _asset.balanceOf(address(this));
         require(balance > 0, "No balance to disembark");
         require(_asset.transfer(_recipient, balance), "Disembark transfer failed");
 
-        emit Disembark(0, 0, keccak256(abi.encodePacked(block.number, _recipient, balance)));
+        emit Disembark(0, 2, hash_);
+    }
+
+    function emitDisembark(bytes32 hash_) external onlyOwner {
+        emit Disembark(0, 2, hash_);
     }
 
     function setRecipient(address recipient_) external onlyOwner {

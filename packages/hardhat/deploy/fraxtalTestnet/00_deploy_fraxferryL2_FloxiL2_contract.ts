@@ -65,7 +65,7 @@ const deployFloxiL2: DeployFunction = async function (hre: HardhatRuntimeEnviron
 
   // l2.floxiL2 = await floxiSfraxEth.getAddress();
 
-  console.log(`FloxiL2: ${floxiSfraxEth.getAddress()}`);
+  console.log(`FloxiL2: ${await floxiSfraxEth.getAddress()}`);
 
   await floxiSfraxEth.transferOwnership(l2.treasury);
 

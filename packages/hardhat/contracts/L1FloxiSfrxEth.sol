@@ -6,7 +6,14 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IDelegationManager} from "./IDelegationManager.sol";
 import {IStrategy} from "./IStrategy.sol";
+// import {L1CrossDomainMessenger} from "@eth-optimism/contracts-bedrock/src/L1/L1CrossDomainMessenger.sol";
 import "hardhat/console.sol";
+
+interface IL1CrossDomainMessenger {
+    function sendMessage(address _target, bytes calldata _message, uint32 _minGasLimit) external payable;
+
+    function xDomainMessageSender() external view returns (address);
+}
 
 interface IL1StandardBridge {
     function depositERC20To(
@@ -48,6 +55,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     IERC20 private immutable _asset; // sfraxEth l1
     address private immutable _remoteAsset; // sfraxEth l2
     address private immutable _l1StandardBridgeProxy;
+    address private immutable _l1CrossDomainMessenger;
     address private immutable _eigenLayerStrategyManager;
     IStrategy private immutable _eigenLayerStrategy;
     IDelegationManager private immutable _eigenLayerDelegationManager;
@@ -92,6 +100,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         IERC20 asset_,
         address remoteAsset_,
         address l1StandardBridgeProxy_,
+        address l1CrossDomainMessenger_,
         address eigenLayerStrategyManager_,
         address eigenLayerStrategy_,
         address eigenLayerDelegationManager_,
@@ -102,6 +111,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         _asset = asset_;
         _remoteAsset = remoteAsset_;
         _l1StandardBridgeProxy = l1StandardBridgeProxy_;
+        _l1CrossDomainMessenger = l1CrossDomainMessenger_;
         _eigenLayerStrategyManager = eigenLayerStrategyManager_;
         _eigenLayerStrategy = IStrategy(eigenLayerStrategy_);
         _eigenLayerDelegationManager = IDelegationManager(eigenLayerDelegationManager_);
@@ -119,7 +129,6 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     function setRemoteContract(address floxiL2) public onlyOwner {
         _remoteContract = floxiL2;
     }
-
 
     function asset() public view returns (address) {
         return address(_asset);
@@ -298,6 +307,17 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         emit AssetsShippedToL2(
             _remoteContract,
             _reservedAssets
+        );
+    }
+
+    function updateTotalAssetsL2() external {
+        bytes memory message = abi.encodeWithSignature("receiveTotalAssets(uint256)", totalAssets());
+
+        // Send the message to L2 via the Cross Domain Messenger
+        IL1CrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
+            _remoteAsset, // Address of the L2 contract to call
+            message, // Encoded message data
+            1000000  // Gas limit for the message execution on L2
         );
     }
 

@@ -53,11 +53,27 @@ const config: HardhatUserConfig = {
         blockNumber: 7891572,
       },
       deploy: ["deploy/hardhat"],
+      // blockGasLimit: 3000000000000000
     },
     mainnet: {
       url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
       deploy: ["deploy/mainnet"],
+    },
+    holesky: {
+      url: `https://eth-holesky.g.alchemy.com/v2/${providerApiKey}`,
+      accounts: [deployerPrivateKey],
+      deploy: ["deploy/holesky"],
+    },
+    fraxtal: {
+      url: "https://rpc.frax.com",
+      accounts: [deployerPrivateKey],
+      deploy: ["deploy/fraxtal"],
+    },
+    fraxtalTestnet: {
+      url: `https://fraxtal-holesky.gateway.tenderly.co/${process.env.TENDERLY_API_KEY}`,
+      accounts: [deployerPrivateKey],
+      deploy: ["deploy/fraxtalTestnet"],
     },
     sepolia: {
       url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
@@ -126,21 +142,6 @@ const config: HardhatUserConfig = {
     pgnTestnet: {
       url: "https://sepolia.publicgoods.network",
       accounts: [deployerPrivateKey],
-    },
-    holesky: {
-      url: `https://eth-holesky.g.alchemy.com/v2/${providerApiKey}`,
-      accounts: [deployerPrivateKey],
-      deploy: ["deploy/holesky"],
-    },
-    fraxtal: {
-      url: "https://rpc.frax.com",
-      accounts: [deployerPrivateKey],
-      deploy: ["deploy/fraxtal"],
-    },
-    fraxtalTestnet: {
-      url: "https://rpc.testnet.frax.com",
-      accounts: [deployerPrivateKey],
-      deploy: ["deploy/fraxtalTestnet"],
     },
   },
   // configuration for harhdat-verify plugin

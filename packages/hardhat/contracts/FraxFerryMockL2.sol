@@ -20,10 +20,19 @@ contract FraxFerryMockL2 is Ownable {
         require(_asset.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
         uint amountAfterFee = amount - calculateFee(amount);
-        emit Embark(msg.sender, block.number, amount, amountAfterFee, block.timestamp);
+        emit Embark(msg.sender, 1, amount, amountAfterFee, block.timestamp);
 
         // Mock logic for departing to L1
-        emit Depart(block.number, 0, 0, keccak256(abi.encodePacked(block.number, msg.sender, amountAfterFee)));
+        emit Depart(block.number, 0, 2, keccak256(abi.encodePacked(block.number, msg.sender, amountAfterFee)));
+    }
+
+    function emitEmbark() external onlyOwner {
+        emit Embark(msg.sender, 1, 100000000, 1000000000, block.timestamp);
+    }
+
+    function emitDepart() external onlyOwner {
+        uint amountAfterFee = 10000000000000;
+        emit Depart(block.number, 0, 2, keccak256(abi.encodePacked(block.number, msg.sender, amountAfterFee)));
     }
 
     function calculateFee(uint amount) public pure returns (uint) {

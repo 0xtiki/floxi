@@ -39,7 +39,6 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
       l1.eigen_rewardsCoordinator,
     ],
     log: true,
-    nonce: 24,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
     // autoMine: true,
@@ -55,13 +54,13 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
 
   // console.log(`FloxiL1 remote contract set to: ${l2.floxiL2}`);
 
-  // await floxiSfraxEth.setClaimer(l1.treasury);
+  await floxiSfraxEth.setClaimer(l1.treasury);
 
-  // console.log(`FloxiL1 claimer set to: ${l1.treasury}`);
+  console.log(`FloxiL1 claimer set to: ${l1.treasury}`);
 
-  // await floxiSfraxEth.delegate(l1.eigen_operator);
+  await floxiSfraxEth.delegate(l1.eigen_operator);
 
-  // console.log(`FloxiL1 delegate set to: ${l1.eigen_operator}`);
+  console.log(`FloxiL1 delegate set to: ${l1.eigen_operator}`);
 
   await floxiSfraxEth.transferOwnership(l1.treasury);
 

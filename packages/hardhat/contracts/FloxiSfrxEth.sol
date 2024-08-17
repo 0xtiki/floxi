@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -14,6 +15,14 @@ interface IFraxFerry {
     function embarkWithRecipient(uint amount, address recipient) external;
 
     function paused() external view returns (bool);
+
+    function FEE_RATE() external view returns (uint);
+
+    function FEE_MIN() external view returns (uint);
+
+    function FEE_MAX() external view returns (uint);
+
+    function REDUCED_DECIMALS() external view returns (uint);
 }
 
 /**
@@ -44,22 +53,22 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     // === Constants and immutables ===
 
     // The vaults underlying asset on local chain (sfrxEth)
-    IERC20 private immutable _asset;
+    IERC20 public immutable _asset;
 
     // Remote asset address on the destination chain (sfrxEth)
-    address private immutable _remoteAsset;
+    address public immutable _remoteAsset;
 
     // Floxi vault contract address on the destination chain
-    address private immutable _remoteContract;
+    address public immutable _remoteContract;
 
     // Treasury address for collecting fees
-    address private immutable _treasury;
+    address public immutable _treasury;
 
     // Address of the L2 Standard Bridge proxy
     // address private immutable _l2StandardBridgeProxy;
 
     // FraxFerry V2 Fraxtal https://github.com/FraxFinance/frax-solidity/blob/master/src/types/constants.ts#L4341C60-L4341C102
-    address private immutable _fraxFerry;
+    address public immutable _fraxFerry;
 
     // Scale for basis point calculations
     uint256 private constant _BASIS_POINT_SCALE = 1e4;
@@ -74,9 +83,9 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     uint256 private constant _GAS_PRICE = 30;
 
     // Placeholder, will be defined more appropriately in production (probably adding a batcher at some point)
-    uint256 private constant _MIN_DEPOSIT = 1000000000000000; // 0.001 ether
+    uint256 public constant _MIN_DEPOSIT = 1000000000000000; // 0.001 ether
 
-    uint256 private constant _MAX_QUEUED_WITHDRAWALS = 5;
+    uint256 public constant _MAX_QUEUED_WITHDRAWALS = 5;
 
 
     constructor(
@@ -102,23 +111,35 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     // === Variables ===
 
     // Tracks assets on L1
-    uint256 private _l1Assets = 0;
+    uint256 public _l1Assets = 0;
 
     DoubleEndedQueue.Bytes32Deque private _withdrawalQueue;
 
-    mapping(address account => uint256) private _unlockedAssets;
+    mapping(address account => uint256) public _unlockedAssets;
 
-    mapping(address account => uint256) private _queuedAssets;
+    mapping(address account => uint256) public _queuedAssets;
 
-    mapping(bytes32 id => uint256) private _queuedWithdrawals;
+    mapping(bytes32 id => uint256) public _queuedWithdrawals;
 
-    mapping(address account => uint256) private _activeWithdrawalsCount;
+    mapping(address account => uint256) public _activeWithdrawalsCount;
 
     // uint256 private _reservedAssets;
 
-    uint256 private _withdrawalNonce;
+    uint256 public _withdrawalNonce;
 
-    uint256 private _unlockNonce;
+    uint256 public _unlockNonce;
+
+    // function deposit(uint256 assets, address receiver) public override returns (uint256) {
+    //     uint256 maxAssets = maxDeposit(receiver);
+    //     if (assets > maxAssets) {
+    //         revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
+    //     }
+
+    //     uint256 shares = previewDeposit(assets);
+    //     _deposit(_msgSender(), receiver, assets, shares);
+
+    //     return shares;
+    // }
 
     /**
      * @dev Handles deposits into the vault, charges an entry fee, and bridges assets to L1.
@@ -133,32 +154,38 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
 
         require (IFraxFerry(_fraxFerry).paused() == false);
 
-        uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
+        uint256 entryFee = _feeOnTotal(assets, _entryFeeBasisPoints());
         address recipient = _entryFeeRecipient();
 
         super._deposit(caller, receiver, assets, shares);
 
-        uint256 feeInclusive = assets - fee;
+        uint256 feeInclusive = assets - entryFee;
 
-        if (fee > 0 && recipient != address(this)) {
-            _asset.transfer(recipient, fee);
+        uint256 roudedAmout = (feeInclusive/IFraxFerry(_fraxFerry).REDUCED_DECIMALS())*IFraxFerry(_fraxFerry).REDUCED_DECIMALS();
+
+        uint256 roundingError = feeInclusive - roudedAmout;
+
+        if (entryFee > 0 && recipient != address(this)) {
+            _asset.transfer(recipient, entryFee + roundingError);
         }
 
-        shipToL1(feeInclusive);
+        shipToL1(roudedAmout);
     }
 
     function shipToL1(uint256 assets) internal {
 
-        bool success = _asset.approve(_fraxFerry, assets + _asset.allowance(address(this), _fraxFerry));
+        bool success = _asset.approve(_fraxFerry, assets);
 
         require(success, "Approval failed");
 
+        uint256 ticket = ferryTicket(assets);
+
         try IFraxFerry(_fraxFerry).embarkWithRecipient(assets, _remoteContract) {
-             _l1Assets += assets;
+             _l1Assets += assets - ticket;
 
             emit AssetsShippedToL1(
                 _remoteContract,
-                assets
+                assets - ticket
             );
         }
         catch {
@@ -174,7 +201,7 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     function queueWithdrawal(uint256 assets) public returns (uint256) {
         uint256 maxAssets = maxWithdraw(msg.sender) - _queuedAssets[msg.sender];
 
-        require(assets > maxAssets, "requested withdrawal exceeds balance");
+        require(assets <= maxAssets, "requested withdrawal exceeds balance");
 
         require(_activeWithdrawalsCount[msg.sender] < _MAX_QUEUED_WITHDRAWALS);
 
@@ -203,6 +230,8 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
 
     // only xDomainMessenger from remoteContract
     function unlockWithdrawals(uint256 assets, uint256 maxIterations) external onlyOwner {
+        require(DoubleEndedQueue.empty(_withdrawalQueue) == false, 'No withdrawals in queue');
+
         uint256 iterations = 0;
         uint256 availableAssets = _asset.balanceOf(address(this));
         uint256 unlockFrom = _unlockNonce;
@@ -271,6 +300,10 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
         return _l1Assets;
     }
 
+    function setL1Assets(uint256 amount) external onlyOwner {
+        _l1Assets = amount;
+    }
+
     // === Fee configuration ===
 
     /**
@@ -308,9 +341,13 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
      * @param assets The amount of assets to deposit.
      * @return The number of shares corresponding to the deposited assets after fees.
      */
-    function previewDeposit(uint256 assets) public view virtual override returns (uint256) {
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
         uint256 fee = _feeOnTotal(assets, _entryFeeBasisPoints());
-        return super.previewDeposit(assets - fee);
+        uint256 feeInclusive = assets - fee;
+        uint256 roudedAmout = (feeInclusive/IFraxFerry(_fraxFerry).REDUCED_DECIMALS())*IFraxFerry(_fraxFerry).REDUCED_DECIMALS();
+        // uint256 roundingError = feeInclusive - roudedAmout;
+        uint256 ticket = ferryTicket(roudedAmout);
+        return super.previewDeposit(roudedAmout - ticket);
     }
 
     /**
@@ -321,6 +358,10 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     function previewMint(uint256 shares) public view virtual override returns (uint256) {
         uint256 assets = super.previewMint(shares);
         return assets + _feeOnRaw(assets, _entryFeeBasisPoints());
+    }
+
+    function ferryTicket(uint256 roundedAmount) public view returns (uint){
+        return Math.min(Math.max(IFraxFerry(_fraxFerry).FEE_MIN(), roundedAmount * IFraxFerry(_fraxFerry).FEE_RATE()/10000), IFraxFerry(_fraxFerry).FEE_MAX());
     }
 
     /**

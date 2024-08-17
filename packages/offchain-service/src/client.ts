@@ -21,7 +21,7 @@ export const getFraxtalClient = (env: string) => {
     } else {
         return createPublicClient({ 
             chain: fraxtalTestnet, 
-            transport: http('https://rpc.testnet.frax.com'), 
+            transport: http(`https://fraxtal-holesky.gateway.tenderly.co/${process.env.TENDERLY_API_KEY}`), 
         });
     }
 };
@@ -42,15 +42,35 @@ export const getMainnetClient = (env: string) => {
     } else {
         return createPublicClient({ 
             chain: holesky, 
-            transport: http('https://rpc.holesky.ethpandaops.io'), 
+            transport: http(`https://eth-holesky.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
         });
     }
 };
 
+export const getFraxtalWalletClient = (env: string) => {
+    if (env === 'mainnet') {
+        return createWalletClient({ 
+            chain: fraxtal, 
+            transport: http('https://rpc.frax.com'), 
+        });
+    } else {
+        return createWalletClient({ 
+            chain: fraxtalTestnet, 
+            transport: http(`https://fraxtal-holesky.gateway.tenderly.co/${process.env.TENDERLY_API_KEY}`), 
+        });
+    }
+};
 
-// const walletClient = createWalletClient({
-//     chain: fraxtalTestnet,
-//     transport: http('https://rpc.testnet.frax.com')
-//     // chain: holesky,
-//     // transport: http('https://rpc.holesky.ethpandaops.io')
-// })
+export const getMainnetWalletClient = (env: string) => {
+    if (env === 'mainnet') {
+        return createWalletClient({ 
+            chain: mainnet, 
+            transport: http(`https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
+        });
+    } else {
+        return createWalletClient({ 
+            chain: holesky, 
+            transport: http(`https://eth-holesky.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
+        });
+    }
+};

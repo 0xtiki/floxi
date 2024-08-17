@@ -1641,7 +1641,7 @@ const deployedContracts = {
   },
   2522: {
     FloxiSfrxEth: {
-      address: "0x344497DB1d533240692B419BC0f9792Cb402FA77",
+      address: "0xa9B291FE9a5a1ABd031A35060338b9E9823571b2",
       abi: [
         {
           inputs: [
@@ -2131,6 +2131,212 @@ const deployedContracts = {
           type: "event",
         },
         {
+          inputs: [],
+          name: "_MAX_QUEUED_WITHDRAWALS",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_MIN_DEPOSIT",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "_activeWithdrawalsCount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_asset",
+          outputs: [
+            {
+              internalType: "contract IERC20",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_fraxFerry",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_l1Assets",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "_queuedAssets",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "id",
+              type: "bytes32",
+            },
+          ],
+          name: "_queuedWithdrawals",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_remoteAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_remoteContract",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_treasury",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_unlockNonce",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "_unlockedAssets",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "_withdrawalNonce",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "address",
@@ -2302,6 +2508,25 @@ const deployedContracts = {
             },
           ],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "feeInclusive",
+              type: "uint256",
+            },
+          ],
+          name: "ferryTicket",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -2739,6 +2964,19 @@ const deployedContracts = {
           stateMutability: "nonpayable",
           type: "function",
         },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "withdrawFunds",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
       ],
       inheritedFunctions: {
         allowance: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
@@ -2772,7 +3010,7 @@ const deployedContracts = {
       },
     },
     FraxFerryMockL2: {
-      address: "0x101159bfCf82800FC34b52eA9d091c0ea11c8922",
+      address: "0x1794Be9dFEdF17619386fE69C756448f9cF64734",
       abi: [
         {
           inputs: [
@@ -2933,6 +3171,20 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "emitDepart",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "emitEmbark",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "owner",
           outputs: [
             {
@@ -2987,7 +3239,7 @@ const deployedContracts = {
   },
   17000: {
     FraxFerryMockL1: {
-      address: "0x3AB033Fc3b1818DE720C5C8b2C519AA3D1a93111",
+      address: "0x6014c4fD1BC5C8FC8c70838644b095AFCa53F568",
       abi: [
         {
           inputs: [
@@ -3067,8 +3319,27 @@ const deployedContracts = {
           type: "event",
         },
         {
-          inputs: [],
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "hash_",
+              type: "bytes32",
+            },
+          ],
           name: "disembark",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "hash_",
+              type: "bytes32",
+            },
+          ],
+          name: "emitDisembark",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -3140,7 +3411,7 @@ const deployedContracts = {
       },
     },
     L1FloxiSfrxEth: {
-      address: "0x8B3F170107950c89bFb2f9B6C194d1EA06119294",
+      address: "0xa9B291FE9a5a1ABd031A35060338b9E9823571b2",
       abi: [
         {
           inputs: [
@@ -3601,6 +3872,19 @@ const deployedContracts = {
             },
           ],
           name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "withdrawFunds",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
