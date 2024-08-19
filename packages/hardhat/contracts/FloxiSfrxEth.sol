@@ -25,6 +25,15 @@ interface IFraxFerry {
     function REDUCED_DECIMALS() external view returns (uint);
 }
 
+interface ICrossDomainMessenger {
+    function xDomainMessageSender() external view returns (address);
+    function sendMessage(
+        address _target,
+        bytes calldata _message,
+        uint32 _gasLimit
+    ) external;
+}
+
 /**
  * @title FloxiSfrxEth
  * @dev ERC4626 vault that handles deposits, minting, and bridging of ERC20 tokens to another chain.
@@ -58,8 +67,11 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     // Remote asset address on the destination chain (sfrxEth)
     address public immutable _remoteAsset;
 
-    // Floxi vault contract address on the destination chain
+    // Floxi vault contract address on L1
     address public immutable _remoteContract;
+
+    // CrossDomainMessenger contratct on this chain
+    address public immutable _l2CrossDomainMessenger;
 
     // Treasury address for collecting fees
     address public immutable _treasury;
@@ -83,7 +95,7 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
     uint256 private constant _GAS_PRICE = 30;
 
     // Placeholder, will be defined more appropriately in production (probably adding a batcher at some point)
-    uint256 public constant _MIN_DEPOSIT = 1000000000000000; // 0.001 ether
+    uint256 public constant _MIN_DEPOSIT = 100000000000000000; // 0.1 ether
 
     uint256 public constant _MAX_QUEUED_WITHDRAWALS = 5;
 
@@ -92,6 +104,7 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
         IERC20 asset_,
         address remoteAsset_,
         address remoteContract_,
+        address l2CrossDomainMessenger_,
         address treasury_,
         // address l2StandardBridgeProxy_,
         address fraxFerry_
@@ -103,6 +116,7 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
         _asset = asset_;
         _remoteAsset = remoteAsset_;
         _remoteContract = remoteContract_;
+        _l2CrossDomainMessenger = l2CrossDomainMessenger_;
         _treasury = treasury_;
         // _l2StandardBridgeProxy = l2StandardBridgeProxy_;
         _fraxFerry = fraxFerry_;
@@ -123,23 +137,9 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
 
     mapping(address account => uint256) public _activeWithdrawalsCount;
 
-    // uint256 private _reservedAssets;
-
     uint256 public _withdrawalNonce;
 
     uint256 public _unlockNonce;
-
-    // function deposit(uint256 assets, address receiver) public override returns (uint256) {
-    //     uint256 maxAssets = maxDeposit(receiver);
-    //     if (assets > maxAssets) {
-    //         revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
-    //     }
-
-    //     uint256 shares = previewDeposit(assets);
-    //     _deposit(_msgSender(), receiver, assets, shares);
-
-    //     return shares;
-    // }
 
     /**
      * @dev Handles deposits into the vault, charges an entry fee, and bridges assets to L1.
@@ -384,6 +384,23 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
      */
     function _feeOnTotal(uint256 assets, uint256 feeBasisPoints) private pure returns (uint256) {
         return assets.mulDiv(feeBasisPoints, feeBasisPoints + _BASIS_POINT_SCALE, Math.Rounding.Ceil) + calculateL1GasFeeInWei(_GAS_PRICE);
+    }
+
+    modifier onlyRemoteContract() {
+        require(
+            msg.sender == _l2CrossDomainMessenger,
+            "Sender must be the CrossDomainMessenger"
+        );
+
+        require(
+            ICrossDomainMessenger(_l2CrossDomainMessenger).xDomainMessageSender() == _remoteContract,
+            "Remote sender must be Floxi L1"
+        );
+        _;
+    }
+
+    function updateL1Assets(uint256 l1Assets_) public onlyRemoteContract {
+        _l1Assets = l1Assets_;
     }
 
     // for POC only

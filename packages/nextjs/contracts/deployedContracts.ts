@@ -1612,26 +1612,37 @@ const deployedContracts = {
         approve: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         asset: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         balanceOf: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToShares: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToShares:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         decimals: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         deposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         mint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         name: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewMint:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewRedeem:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         redeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         symbol: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalSupply: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalSupply:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         transfer: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        transferFrom: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        transferFrom:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         withdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
@@ -1641,7 +1652,7 @@ const deployedContracts = {
   },
   2522: {
     FloxiSfrxEth: {
-      address: "0xa9B291FE9a5a1ABd031A35060338b9E9823571b2",
+      address: "0x749B85c801b76439D60384A2b1f3Ac1FA9b7859f",
       abi: [
         {
           inputs: [
@@ -1658,6 +1669,11 @@ const deployedContracts = {
             {
               internalType: "address",
               name: "remoteContract_",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "l2CrossDomainMessenger_",
               type: "address",
             },
             {
@@ -2215,6 +2231,19 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [],
+          name: "_l2CrossDomainMessenger",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "address",
@@ -2514,7 +2543,7 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "uint256",
-              name: "feeInclusive",
+              name: "roundedAmount",
               type: "uint256",
             },
           ],
@@ -2813,6 +2842,19 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "setL1Assets",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "symbol",
           outputs: [
@@ -2939,6 +2981,19 @@ const deployedContracts = {
           inputs: [
             {
               internalType: "uint256",
+              name: "l1Assets_",
+              type: "uint256",
+            },
+          ],
+          name: "updateL1Assets",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
               name: "assets",
               type: "uint256",
             },
@@ -2983,26 +3038,37 @@ const deployedContracts = {
         approve: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         asset: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         balanceOf: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToShares: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToShares:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         decimals: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         deposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         mint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         name: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewMint:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewRedeem:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         redeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         symbol: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalSupply: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalSupply:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         transfer: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        transferFrom: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        transferFrom:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         withdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         owner: "@openzeppelin/contracts/access/Ownable.sol",
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
@@ -3010,7 +3076,7 @@ const deployedContracts = {
       },
     },
     FraxFerryMockL2: {
-      address: "0x1794Be9dFEdF17619386fE69C756448f9cF64734",
+      address: "0x7443eF74594004763574d30C0DEc8DbD2F3241af",
       abi: [
         {
           inputs: [
@@ -3133,6 +3199,84 @@ const deployedContracts = {
           type: "event",
         },
         {
+          inputs: [],
+          name: "FEE_MAX",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "FEE_MIN",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "FEE_RATE",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_WAIT_PERIOD_ADD",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_WAIT_PERIOD_EXECUTE",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "REDUCED_DECIMALS",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "uint256",
@@ -3198,6 +3342,19 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "paused",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "renounceOwnership",
           outputs: [],
           stateMutability: "nonpayable",
@@ -3239,7 +3396,7 @@ const deployedContracts = {
   },
   17000: {
     FraxFerryMockL1: {
-      address: "0x6014c4fD1BC5C8FC8c70838644b095AFCa53F568",
+      address: "0x312390cF6B13350542fB92Ad2091A6C50A44a0DD",
       abi: [
         {
           inputs: [
@@ -3359,6 +3516,19 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "paused",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
           name: "renounceOwnership",
           outputs: [],
           stateMutability: "nonpayable",
@@ -3411,7 +3581,7 @@ const deployedContracts = {
       },
     },
     L1FloxiSfrxEth: {
-      address: "0xa9B291FE9a5a1ABd031A35060338b9E9823571b2",
+      address: "0xe5cDe99ef123DF0E66e36332d40aF00Cf8bA18C1",
       abi: [
         {
           inputs: [
@@ -3428,6 +3598,11 @@ const deployedContracts = {
             {
               internalType: "address",
               name: "l1StandardBridgeProxy_",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "l1CrossDomainMessenger_",
               type: "address",
             },
             {
@@ -3644,6 +3819,19 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [],
+          name: "calimer",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               components: [
@@ -3694,19 +3882,6 @@ const deployedContracts = {
           type: "function",
         },
         {
-          inputs: [
-            {
-              internalType: "address",
-              name: "operator_",
-              type: "address",
-            },
-          ],
-          name: "delegate",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
           inputs: [],
           name: "depositIntoStrategy",
           outputs: [],
@@ -3724,6 +3899,19 @@ const deployedContracts = {
           name: "initiateEigenlayerWithdrawal",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "isDelegate",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -3781,6 +3969,19 @@ const deployedContracts = {
             },
           ],
           name: "setClaimer",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "operator_",
+              type: "address",
+            },
+          ],
+          name: "setDelegate",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -3872,6 +4073,13 @@ const deployedContracts = {
             },
           ],
           name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "updateTotalAssetsL2",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -4748,26 +4956,37 @@ const deployedContracts = {
         approve: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         asset: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         balanceOf: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        convertToShares: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        convertToShares:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         decimals: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         deposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         maxRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        maxWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        maxWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         mint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         name: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewDeposit: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewMint: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewRedeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        previewWithdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewDeposit:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewMint:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewRedeem:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        previewWithdraw:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         redeem: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         symbol: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalAssets: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        totalSupply: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalAssets:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        totalSupply:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         transfer: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
-        transferFrom: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
+        transferFrom:
+          "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
         withdraw: "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol",
       },
     },

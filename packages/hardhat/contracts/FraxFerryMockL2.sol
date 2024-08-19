@@ -10,6 +10,14 @@ contract FraxFerryMockL2 is Ownable {
     event Embark(address indexed sender, uint index, uint amount, uint amountAfterFee, uint timestamp);
     event Depart(uint batchNo, uint start, uint end, bytes32 hash);
 
+    uint public MIN_WAIT_PERIOD_ADD=3600; // Minimal 1 hour waiting
+    uint public MIN_WAIT_PERIOD_EXECUTE=79200; // Minimal 22 hour waiting
+    uint public FEE_RATE=0;      // 0.1% fee
+    uint public FEE_MIN=1*1e16;   // 0.01 token min fee
+    uint public FEE_MAX=1*1e16; // 0.01 token max fee
+   
+    uint constant public REDUCED_DECIMALS=1e10;
+
     constructor(IERC20 asset_) 
         Ownable(msg.sender)
     {
@@ -26,11 +34,11 @@ contract FraxFerryMockL2 is Ownable {
         emit Depart(block.number, 0, 2, keccak256(abi.encodePacked(block.number, msg.sender, amountAfterFee)));
     }
 
-    function emitEmbark() external onlyOwner {
+    function emitEmbark() public onlyOwner {
         emit Embark(msg.sender, 1, 100000000, 1000000000, block.timestamp);
     }
 
-    function emitDepart() external onlyOwner {
+    function emitDepart() public onlyOwner {
         uint amountAfterFee = 10000000000000;
         emit Depart(block.number, 0, 2, keccak256(abi.encodePacked(block.number, msg.sender, amountAfterFee)));
     }
@@ -40,7 +48,11 @@ contract FraxFerryMockL2 is Ownable {
         return (amount * 1) / 100;
     }
 
-    function withdraw(uint amount) external onlyOwner {
+    function withdraw(uint amount) public onlyOwner {
         require(_asset.transfer(msg.sender, amount), "Withdrawal failed");
+    }
+
+    function paused() public pure returns (bool) {
+        return false;
     }
 }

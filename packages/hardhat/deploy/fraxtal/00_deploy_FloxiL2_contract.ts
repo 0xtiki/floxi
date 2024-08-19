@@ -29,7 +29,7 @@ const deployFloxiL2: DeployFunction = async function (hre: HardhatRuntimeEnviron
   await deploy("FloxiSfrxEth", {
     from: deployer,
     // Contract constructor arguments
-    args: [l2.sfrxEth, l1.sfrxEth, l1.floxiL1, l2.treasury, l2.fraxFerry],
+    args: [l2.sfrxEth, l1.sfrxEth, l1.floxiL1, l2.xDomainMessenger, l2.treasury, l2.fraxFerry],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.

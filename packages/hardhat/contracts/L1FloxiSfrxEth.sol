@@ -6,13 +6,15 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IDelegationManager} from "./IDelegationManager.sol";
 import {IStrategy} from "./IStrategy.sol";
-// import {L1CrossDomainMessenger} from "@eth-optimism/contracts-bedrock/src/L1/L1CrossDomainMessenger.sol";
 import "hardhat/console.sol";
 
-interface IL1CrossDomainMessenger {
-    function sendMessage(address _target, bytes calldata _message, uint32 _minGasLimit) external payable;
-
+interface ICrossDomainMessenger {
     function xDomainMessageSender() external view returns (address);
+    function sendMessage(
+        address _target,
+        bytes calldata _message,
+        uint32 _gasLimit
+    ) external;
 }
 
 interface IL1StandardBridge {
@@ -164,7 +166,11 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         _depositIntoStrategy();
     }
 
-    function delegate(address operator_) external nonReentrant onlyOwner {
+    function isDelegate() public view returns (address) {
+        return _eignelayerOperator;
+    }
+
+    function setDelegate(address operator_) external nonReentrant onlyOwner {
         require (_eigenLayerDelegationManager.paused() == false, "Delegation Manager Paused");
 
         IDelegationManager.SignatureWithExpiry memory emptySig;
@@ -176,6 +182,10 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         require(_eigenLayerDelegationManager.delegatedTo(address(this)) == operator_, "Delegation failed");
 
         _eignelayerOperator = operator_;
+    }
+
+    function calimer() public view returns (address) {
+        return _claimer;
     }
 
     function setClaimer(address claimer_) external nonReentrant onlyOwner {
@@ -213,6 +223,9 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     // POC, should receive shares as input and generate IDelegationManager.QueuedWithdrawalParams[] but not enough time to debug
     // Taking calldata from ethers for now
     function initiateEigenlayerWithdrawal(bytes calldata calldata_) external nonReentrant onlyOwner {
+
+        require(bytes4(calldata_[:4]) == 0x0dd8dd02, "Function selector missmatch");
+
         bytes calldata data = calldata_[4:];
 
         QueueParams[] memory params = abi.decode(data, (QueueParams[]));
@@ -227,7 +240,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
 
         uint256 assets = _eigenLayerStrategy.sharesToUnderlyingView(shares);
 
-        require(assets > 0);
+        require(assets > 0, "no assets in strategy");
 
         (bool success, bytes memory result) = address(_eigenLayerDelegationManager).call(calldata_);
         require(success, "External call failed");
@@ -311,13 +324,13 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     }
 
     function updateTotalAssetsL2() external {
-        bytes memory message = abi.encodeWithSignature("receiveTotalAssets(uint256)", totalAssets());
+        bytes memory message = abi.encodeWithSignature("updateL1Assets(uint256)", totalAssets());
 
         // Send the message to L2 via the Cross Domain Messenger
-        IL1CrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
-            _remoteAsset, // Address of the L2 contract to call
+        ICrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
+            _remoteContract, // Address of the L2 contract to call
             message, // Encoded message data
-            1000000  // Gas limit for the message execution on L2
+            2000000  // Gas limit for the message execution on L2
         );
     }
 

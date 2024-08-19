@@ -43,9 +43,10 @@ const deployFloxiL2: DeployFunction = async function (hre: HardhatRuntimeEnviron
 
   console.log(`FraxFerryL2: ${l2.fraxFerry}`);
 
-  await fraxFerryMock.transferOwnership(l2.treasury);
+  const tx1 = await fraxFerryMock.transferOwnership(l2.treasury);
+  await tx1.wait();
 
-  console.log(`FraxFerryL2 ownership transferred to: ${l2.treasury}`);
+  console.log(`FraxFerryL2 ownership transferred to: ${await fraxFerryMock.owner()}`);
 
   await setTimeout(10000);
 
@@ -54,7 +55,7 @@ const deployFloxiL2: DeployFunction = async function (hre: HardhatRuntimeEnviron
   await deploy("FloxiSfrxEth", {
     from: deployer,
     // Contract constructor arguments
-    args: [l2.sfrxEth, l1.sfrxEth, l1.floxiL1, l2.treasury, l2.fraxFerry],
+    args: [l2.sfrxEth, l1.sfrxEth, l1.floxiL1, l2.xDomainMessenger, l2.treasury, l2.fraxFerry],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -68,8 +69,9 @@ const deployFloxiL2: DeployFunction = async function (hre: HardhatRuntimeEnviron
   console.log(`FloxiL2: ${await floxiSfraxEth.getAddress()}`);
 
   await floxiSfraxEth.transferOwnership(l2.treasury);
+  // await tx2.wait();
 
-  console.log(`FloxiL2 ownerhip transferred to: ${l2.treasury}`);
+  // console.log(`FloxiL2 ownerhip transferred to: ${await floxiSfraxEth.owner()}`);
 };
 
 export default deployFloxiL2;

@@ -33,6 +33,7 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
       l1.sfrxEth,
       l2.sfrxEth,
       l1.l1StandardBridge,
+      l1.xDomainMessenger,
       l1.eigen_strategyManager,
       l1.eigen_strategy,
       l1.eigen_delegationManager,

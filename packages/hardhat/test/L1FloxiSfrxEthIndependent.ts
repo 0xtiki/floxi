@@ -136,21 +136,12 @@ describe("L1Floxi", function () {
       console.log(`Contract balance after transfer: ${contractBalance.toString()}`);
       expect(contractBalance).to.equal(ethers.parseEther("10"));
 
-      // Step 2: Approve the contract to spend sfrxEth
-      const approveTx = await (sfrxEth as unknown as IERC20)
-        .connect(owner)
-        .approve(contractAddress, ethers.parseEther("10"));
-      await approveTx.wait();
-      const allowance = await sfrxEth.allowance(owner.address, contractAddress);
-      console.log(`Allowance set: ${allowance.toString()}`);
-      expect(allowance).to.equal(ethers.parseEther("10"));
-
-      // Step 3: Deposit into the Eigenlayer strategy
+      // Step 2: Deposit into the Eigenlayer strategy
       const depositTx = await contract.connect(owner).depositIntoStrategy();
       const receipt = await depositTx.wait();
       console.log(`Deposit transaction successful, gas used: ${receipt?.gasUsed.toString()}`);
 
-      // Step 4: Assertions
+      // Step 3: Assertions
       const strategyListLength = await eigenStrategyMan.stakerStrategyListLength(contractAddress);
       const strategyShares = await eigenStrategyMan.stakerStrategyShares(contractAddress, eigenLayerStrategy);
       const totalStakedAssets = await contract.totalStakedAssets();
@@ -177,7 +168,7 @@ describe("L1Floxi", function () {
       await depositTx.wait();
 
       // Delegate to the operator
-      const delegateTx = await contract.connect(owner).delegate(eigenYields);
+      const delegateTx = await contract.connect(owner).setDelegate(eigenYields);
       await delegateTx.wait();
 
       // Assertions
@@ -305,15 +296,15 @@ describe("L1Floxi", function () {
       expect(event).to.not.be.undefined;
     });
 
-    xit("should log calldata", async function () {
+    it("should log calldata", async function () {
       // const contractAddy = await contract.getAddress();
       // console.log(contractAddy)
 
       const queuedWithdrawalParams = [];
       queuedWithdrawalParams[0] = {
-        strategies: [eigenLayerStrategy],
-        shares: [ethers.parseEther("10")],
-        withdrawer: await contract.getAddress(),
+        strategies: [constants.holesky.eigen_strategy], // eigenLayerStrategy
+        shares: [982669870000000000n],
+        withdrawer: "0xe5cDe99ef123DF0E66e36332d40aF00Cf8bA18C1", // await contract.getAddress(),
       };
 
       const iface = new ethers.Interface(delegationManagerAbi);
@@ -345,7 +336,7 @@ describe("L1Floxi", function () {
 
       // Step 2: Delegate to the operator (required for withdrawal)
       console.log("Delegating to operator...");
-      const delegateTx = await contract.connect(owner).delegate(eigenYields);
+      const delegateTx = await contract.connect(owner).setDelegate(eigenYields);
       await delegateTx.wait();
 
       // Step 3: Prepare calldata for withdrawal
@@ -403,7 +394,7 @@ describe("L1Floxi", function () {
 
       // Step 2: Delegate to the operator (required for withdrawal)
       console.log("Delegating to operator...");
-      const delegateTx = await contract.connect(owner).delegate(eigenYields);
+      const delegateTx = await contract.connect(owner).setDelegate(eigenYields);
       await delegateTx.wait();
 
       // Step 3: Prepare calldata for withdrawal
@@ -448,6 +439,10 @@ describe("L1Floxi", function () {
           shares: [decodedWithdrawal[6][0]],
         };
       }
+
+      // const abiCoder = ethers.AbiCoder.defaultAbiCoder()
+
+      // const data = abiCoder
 
       expect(withdrawal).to.not.be.undefined;
 
@@ -574,6 +569,31 @@ describe("L1Floxi", function () {
       await expect(contract.connect(owner).initiateEigenlayerWithdrawal(calldata)).to.be.revertedWith(
         "Shares requested too high",
       );
+    });
+
+    it("should send cross domain message", async function () {
+      const contractAddress = await contract.getAddress();
+
+      // Step 1: Transfer sfrxEth to the contract
+      await sfrxEth.transfer(contractAddress, ethers.parseEther("10"));
+      const contractBalance = await sfrxEth.balanceOf(contractAddress);
+      console.log(`Contract balance after transfer: ${contractBalance.toString()}`);
+      expect(contractBalance).to.equal(ethers.parseEther("10"));
+
+      // Step 2: Deposit into the Eigenlayer strategy
+      const depositTx = await contract.connect(owner).depositIntoStrategy();
+      const receipt = await depositTx.wait();
+      console.log(`Deposit transaction successful, gas used: ${receipt?.gasUsed.toString()}`);
+
+      // Step 3: Assertions
+      const totalAssets = await contract.totalAssets();
+      console.log(`Total Assets: ${totalAssets.toString()}`);
+      expect(totalAssets).to.equal(ethers.parseEther("10"));
+
+      // Step 4: Send cross domain message to update total assets on l2
+      const xdomainTx = await contract.connect(owner).updateTotalAssetsL2();
+      const xreceipt = await xdomainTx.wait();
+      console.log(`Sent message to xDomainMessenger, gas used: ${xreceipt?.gasUsed.toString()}`);
     });
   });
 });

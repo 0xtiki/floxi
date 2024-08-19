@@ -33,6 +33,7 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
       l1.sfrxEth,
       l2.sfrxEth,
       l1.l1StandardBridge,
+      l1.xDomainMessenger,
       l1.eigen_strategyManager,
       l1.eigen_strategy,
       l1.eigen_delegationManager,
@@ -54,17 +55,20 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
 
   // console.log(`FloxiL1 remote contract set to: ${l2.floxiL2}`);
 
-  await floxiSfraxEth.setClaimer(l1.treasury);
+  // const tx1 = await floxiSfraxEth.setClaimer(l1.treasury);
+  // await tx1.wait();
 
-  console.log(`FloxiL1 claimer set to: ${l1.treasury}`);
+  // console.log(`FloxiL1 claimer set to: ${await floxiSfraxEth.claimer()}`);
 
-  await floxiSfraxEth.delegate(l1.eigen_operator);
+  // const tx2 = await floxiSfraxEth.setDelegate(l1.eigen_operator);
+  // await tx2.wait();
 
-  console.log(`FloxiL1 delegate set to: ${l1.eigen_operator}`);
+  // console.log(`FloxiL1 delegate set to: ${await floxiSfraxEth.isDelegate()}`);
 
   await floxiSfraxEth.transferOwnership(l1.treasury);
+  // await tx3.wait();
 
-  console.log(`FloxiL1 ownerhip transferred to: ${l1.treasury}`);
+  // console.log(`FloxiL1 ownerhip transferred to: ${await floxiSfraxEth.owner()}`);
 };
 
 export default deployFloxiL1;

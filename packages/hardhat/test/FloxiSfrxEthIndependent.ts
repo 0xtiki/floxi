@@ -14,6 +14,7 @@ const floxiMainnet = "0x0000000000000000000000000000000000000000";
 const FORK_BLOCK = 7891572;
 const fraxtalMainnetRPC = "https://rpc.frax.com";
 const fraxferry = "0x67c6A8A715fc726ffD0A40588701813d9eC04d9C";
+const l2CrossDomainMessenger = "0x4200000000000000000000000000000000000007";
 
 const resetFork = async () => {
   await hre.network.provider.request({
@@ -48,6 +49,7 @@ describe("Floxi", function () {
       ADDR_sfrxEth,
       sfrxEthEthereumMainnet,
       floxiMainnet,
+      l2CrossDomainMessenger,
       treasury.address,
       fraxferry,
     );
@@ -149,6 +151,7 @@ describe("Floxi", function () {
         ADDR_sfrxEth,
         sfrxEthEthereumMainnet,
         floxiMainnet,
+        l2CrossDomainMessenger,
         treasury.address,
         "0x0000000000000000000000000000000000000000", // Invalid bridge address
       );

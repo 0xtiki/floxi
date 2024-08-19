@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { Contract } from "ethers";
 import constants from "../../addresses";
 
-const l2 = constants.fraxtalTestnet;
+// const l2 = constants.fraxtalTestnet;
 const l1 = constants.holesky;
 
 /**
@@ -32,7 +32,7 @@ const deployFerryL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
   await deploy("FraxFerryMockL1", {
     from: deployer,
     // Contract constructor arguments
-    args: [l2.sfrxEth],
+    args: [l1.sfrxEth],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -46,8 +46,9 @@ const deployFerryL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
   console.log(`FraxFerryL1: ${l1.fraxFerry}`);
 
   await fraxFerryMock.transferOwnership(l1.treasury);
+  // await tx.wait();
 
-  console.log(`FraxFerryL1 ownerhip transferred to: ${l1.treasury}`);
+  console.log(`FraxFerryL1 ownerhip transferred to: ${await fraxFerryMock.owner()}`);
 };
 
 export default deployFerryL1;
