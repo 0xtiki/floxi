@@ -70,7 +70,7 @@ export const getMainnetWalletClient = (env: string) => {
     } else {
         return createWalletClient({ 
             chain: holesky, 
-            transport: http(`https://eth-holesky.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`), 
+            transport: http(`https://holesky.drpc.org`), 
         });
     }
 };

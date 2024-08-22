@@ -321,17 +321,24 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
             _remoteContract,
             _reservedAssets
         );
+
+        require(updateTotalAssetsL2() == true, "Failed to update L2 assets");
     }
 
-    function updateTotalAssetsL2() external {
+    function updateTotalAssetsL2() internal returns (bool) {
         bytes memory message = abi.encodeWithSignature("updateL1Assets(uint256)", totalAssets());
 
         // Send the message to L2 via the Cross Domain Messenger
-        ICrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
+        try ICrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
             _remoteContract, // Address of the L2 contract to call
             message, // Encoded message data
             2000000  // Gas limit for the message execution on L2
-        );
+        ) {
+            return true;
+        } 
+        catch {
+            revert("Failed to send xDomain message");
+        }
     }
 
     // for POC only

@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { Log, decodeAbiParameters, encodeFunctionData, parseAbi, parseAbiItem, parseAbiParameters } from 'viem';
 import { CronJob } from 'cron';
 import { privateKeyToAccount } from 'viem/accounts';
-import { getFraxtalClient, getMainnetClient, getMainnetWalletClient } from './client';
+import { getFraxtalClient, getFraxtalWalletClient, getMainnetClient, getMainnetWalletClient } from './client';
 import addresses from './addresses';
 import { setTimeout } from "timers/promises";
 import delegationManagerAbi from './delegationManagerAbi.json';
@@ -31,7 +31,8 @@ const l2 = ((en) => {
 const l2Client = getFraxtalClient(env);
 const l1Client = getMainnetClient(env);
 const deployer = privateKeyToAccount(`0x${process.env.DEPLOYER_PRIVATE_KEY!.slice(2)}`);
-const mWalletClient = getMainnetWalletClient(env);
+const l1WalletClient = getMainnetWalletClient(env);
+const l2WalletClient = getFraxtalWalletClient(env);
 
 
 // l2.fraxFerry = '0x1794Be9dFEdF17619386fE69C756448f9cF64734';
@@ -54,7 +55,7 @@ const mWalletClient = getMainnetWalletClient(env);
 //     gas: 200000n
 // });
 
-// const txhash = await mWalletClient.writeContract(request);
+// const txhash = await l1WalletClient.writeContract(request);
 
 // console.log(txhash);
 
@@ -72,6 +73,12 @@ console.log(`account balance mainnet: ${await l1Client.getBalance({
     address: deployer.address,
     blockTag: 'safe'
 })}`)
+
+const transactionCount = await l1Client.getTransactionCount({  
+    address: deployer.address,
+})
+
+console.log(transactionCount)
 
 
 // FloxiL1 events
@@ -119,14 +126,20 @@ const sfrxEthAbi = parseAbi([
 const floxiL1Abi = parseAbi([
     'function depositIntoStrategy() external',
     'function initiateEigenlayerWithdrawal(bytes calldata calldata_) external',
-    'function completeEigenlayerWithdrawal((address,address,address,uint256,uint32,address[],uint256[])) external',
+    'function completeEigenlayerWithdrawal((address staker,address delegatedTo,address withdrawer,uint256 nonce,uint32 startBlock,address[] strategies,uint256[] shares)) external',
     'function shipToL2() external',
 ]);
 
+const floxiL2Abi = parseAbi([
+    'function unlockWithdrawals(uint256 assets, uint256 maxIterations) external',
+    'function setL1Assets(uint256 amount) external',
+    'function getL1Assets() view returns (uint256)',
+]);
+
 const l1QueuedWithdrawals: any[] = [];
-// once a day check if there are withdrawals to finalize
+//checks if there are withdrawals to finalize
 const job = CronJob.from({
-	cronTime: '0 0 0 * * *',
+	cronTime: '1 * * * * *',
 	onTick: async function () {
 		const blockDelay: bigint = await l1Client.readContract({
             address: l1.eigen_delegationManager as `0x${string}`,
@@ -135,25 +148,38 @@ const job = CronJob.from({
             functionName: 'getWithdrawalDelay',
           }) as bigint;
 
-        const lastSafe = (await l2Client.getBlock({
+        const lastSafe = (await l1Client.getBlock({
             blockTag: 'safe'
         })).number;
 
+        console.log(`cron checking withdrawals: ${l1QueuedWithdrawals}`)
+
+        if (l1QueuedWithdrawals.length === 0) return;
+
         for (const withdrawal of l1QueuedWithdrawals) {
-            if (withdrawal.startBlock + blockDelay < lastSafe) {
+            console.log(`checking if withdrawal is safe ${withdrawal}`);
+            console.log(`start block ${withdrawal.startBlock} block delay ${blockDelay} latest safe ${lastSafe}`)
+            console.log(BigInt(withdrawal.startBlock) + blockDelay < lastSafe)
+            if (BigInt(withdrawal.startBlock) + blockDelay < lastSafe) {
                 try {
 
                     const { request } = await l1Client.simulateContract({
                         address: l1.floxiL1 as `0x${string}`,
                         abi: floxiL1Abi,
                         functionName: 'completeEigenlayerWithdrawal',
-                        args:[withdrawal],
+                        //[withdrawal.staker as `0x${string}`, withdrawal.delegatedTo as `0x${string}`, withdrawal.withdrawer as `0x${string}`, withdrawal.nonce as bigint, withdrawal.startBlock as number, withdrawal.strategies as `0x${string}`[], withdrawal.shares as bigint[]]
+                        args: [withdrawal],
                         account: deployer,
+                        maxFeePerGas: 10000000000n,
+                        maxPriorityFeePerGas: 10000000000n,
+                        gas: 3500000n,
                     });
-        
-                    const txhash = await mWalletClient.writeContract(request);
 
-                    console.log(`withdrawal from eigenlayer completed, nonce: ${withdrawal.nonce}, account: ${withdrawal.account}, tx ${txhash}`);
+                    const txhash = await l1WalletClient.writeContract(request);
+            
+                    const transaction = await l1Client.waitForTransactionReceipt({ hash: txhash })
+        
+                    console.log(`withdrawal from eigenlayer completed, nonce: ${withdrawal.nonce}, account: ${withdrawal.account}, tx ${txhash}, receipt: ${transaction}`);
                     console.log(`account balance mainnet after tx: ${await l1Client.getBalance({
                         address: deployer.address,
                         blockTag: 'latest'
@@ -182,11 +208,16 @@ const bridgeToL2 = async () => {
             abi: floxiL1Abi,
             functionName: 'shipToL2',
             account: deployer,
+            maxFeePerGas: 10000000000n,
+            maxPriorityFeePerGas: 10000000000n,
+            gas: 3500000n,
         });
 
-        const txhash = await mWalletClient.writeContract(request);
+        const txhash = await l1WalletClient.writeContract(request);
 
-        console.log(`successfully sent funds to L1StandardBridge, tx ${txhash}`);
+        const transaction = await l1Client.waitForTransactionReceipt({ hash: txhash });
+
+        console.log(`successfully sent funds to L1StandardBridge, tx ${txhash}, receipt: ${transaction}`);
         console.log(`account balance mainnet after tx: ${await l1Client.getBalance({
             address: deployer.address,
             blockTag: 'latest'
@@ -198,7 +229,6 @@ const bridgeToL2 = async () => {
     }
 
 };
-
 
 const handleL2WithdrawalRequest = async (
     logArgs: {
@@ -220,53 +250,102 @@ const handleL2WithdrawalRequest = async (
                 blockTag: 'finalized'
             })).number;
 
-            if (blockNumber <= lastFinalized) {
-
-                console.log('Block finalized.')
-
-                const queuedWithdrawalParams = [];
-                queuedWithdrawalParams[0] = {
-                    strategies: [l1.eigen_strategy],
-                    shares: [logArgs.assets],
-                    withdrawer: l1.floxiL1,
-                }
-
-                const callData = encodeFunctionData({
-                    abi: delegationManagerAbi,
-                    args:  [queuedWithdrawalParams],
-                    functionName: 'queueWithdrawals',
-                });
-
-                try {
-                    const { request } = await l1Client.simulateContract({
-                        address: l1.floxiL1 as `0x${string}`,
-                        abi: floxiL1Abi,
-                        functionName: 'initiateEigenlayerWithdrawal',
-                        args:[callData],
-                        account: deployer,
-                    });
-        
-                    const txhash = await mWalletClient.writeContract(request);
-
-                    console.log(`successfully queued eigenlayer withdrawal, amount: ${logArgs.assets}, tx ${txhash}`);
-                    console.log(`account balance mainnet after tx: ${await l1Client.getBalance({
-                        address: deployer.address,
-                        blockTag: 'latest'
-                    })}`)
-
-                } catch (e) {
-                    console.warn(`failed to queue withdrawal for amount ${logArgs.assets}:`);
-                    console.log(e);
-                }
-            }
-
             finalized = lastFinalized;
         }
+
+        console.log('Block finalized.');
+
+        const queuedWithdrawalParams = [];
+        queuedWithdrawalParams[0] = {
+            strategies: [l1.eigen_strategy],
+            shares: [logArgs.assets],
+            withdrawer: l1.floxiL1,
+        }
+
+        const callData = encodeFunctionData({
+            abi: delegationManagerAbi,
+            args:  [queuedWithdrawalParams],
+            functionName: 'queueWithdrawals',
+        });
+
+        console.log(`calldata ${callData}`);
+
+        try {
+            const { request } = await l1Client.simulateContract({
+                address: l1.floxiL1 as `0x${string}`,
+                abi: floxiL1Abi,
+                functionName: 'initiateEigenlayerWithdrawal',
+                args:[callData],
+                account: deployer,
+                maxFeePerGas: 10000000000n,
+                maxPriorityFeePerGas: 10000000000n,
+                gas: 3500000n,
+            });
+    
+            const txhash = await l1WalletClient.writeContract(request);
+    
+            const transaction = await l1Client.waitForTransactionReceipt({ hash: txhash });
+
+            console.log(`successfully queued eigenlayer withdrawal, amount: ${logArgs.assets}, tx ${txhash}, receipt: ${transaction}`);
+            console.log(`account balance mainnet after tx: ${await l1Client.getBalance({
+                address: deployer.address,
+                blockTag: 'latest'
+            })}`)
+
+        } catch (e) {
+            console.warn(`failed to queue withdrawal for amount ${logArgs.assets}:`);
+            console.log(e);
+        }
+}
+
+const getEigenLayerQueuedWithdrawals = async (blockNumber: bigint, staker: `0x${string}`) => {
+    const eigenLogs = await l1Client.getLogs({  
+        address: l1.eigen_delegationManager as `0x${string}` | undefined,
+        event: eigenlayerEvents.withdrawalQueued,
+        // not indexed.. 
+        // args: [{
+        //     staker: log.args.staker
+        // }],
+        fromBlock: blockNumber,
+        toBlock: blockNumber,
+    });
+
+    for (const eigenLog of eigenLogs) {
+        console.log(`EigenLayer withdrawal: ${eigenLog}`);
+        if (eigenLog.args[1]?.staker === staker) {
+            l1QueuedWithdrawals.push(eigenLog.args[1]);
+
+            console.log(eigenLog.args[1].delegatedTo);
+            console.log(eigenLog.args[1].nonce);
+            console.log(eigenLog.args[1].shares);
+            console.log(eigenLog.args[1].staker);
+            console.log(eigenLog.args[1].startBlock);
+            console.log(eigenLog.args[1].strategies);
+            console.log(eigenLog.args[1].withdrawer);
+        }
+    }
+    console.log(`eigenwithdrawals ${l1QueuedWithdrawals}`);
 }
 
 // deposit flow functions
 
-const handleDisembark = async (hash:`0x${string}`) => {
+const handleDisembark = async (hash:`0x${string}`, blockNumber: bigint) => {
+    let lastSafe = (await l1Client.getBlock({
+        blockTag: 'safe'
+    })).number;
+
+    while (blockNumber > lastSafe) {
+        console.log(`handleDisembark waiting for block finalization of block ${blockNumber}, last safe: ${lastSafe}`);
+
+        await setTimeout(2 * 60000);
+
+        lastSafe = (await l1Client.getBlock({
+            blockTag: 'safe'
+        })).number;
+    }
+
+    console.log(`Block is safe now, checking balance.`);
+
     const bal = await l1Client.readContract({
         address: l1.sfrxEth as `0x${string}`,
         abi: sfrxEthAbi,
@@ -278,16 +357,30 @@ const handleDisembark = async (hash:`0x${string}`) => {
 
     if (bal > 0n) {
         try {
-            const { request } = await l1Client.simulateContract({
+
+            const {
+                maxFeePerGas,
+                maxPriorityFeePerGas
+            } = await l1Client.estimateFeesPerGas();
+
+            console.log(maxFeePerGas);
+            console.log(maxPriorityFeePerGas);
+
+            const result = await l1Client.simulateContract({
                 address: l1.floxiL1 as `0x${string}`,
                 abi: floxiL1Abi,
                 functionName: 'depositIntoStrategy',
                 account: deployer,
+                maxFeePerGas: 10000000000n,
+                maxPriorityFeePerGas: 10000000000n,
+                gas: 3500000n,
             });
 
-            const txhash = await mWalletClient.writeContract(request);
+            const txhash = await l1WalletClient.writeContract(result.request);
 
-            console.log(`successfully disembarked ${hash}, deposit to eigen on tx ${txhash}`);
+            const transaction = await l1Client.waitForTransactionReceipt({ hash: txhash })
+
+            console.log(`successfully disembarked ${hash}, deposit to eigen on tx ${txhash}, receipt: ${transaction}`);
             console.log(`account balance mainnet after tx: ${await l1Client.getBalance({
                 address: deployer.address,
                 blockTag: 'latest'
@@ -342,30 +435,14 @@ const main = async () => {
         event: floxiL1Events.withdrawalInitiated,
         onLogs: async (logs) => {
             for (const log of logs) {
-                console.log(`Withdrawal ${log.args.nonce} initiated. WithdrawalId ${log.args.withdrawalId}, amount: ${log.args.assets}, shares: ${log.args.shares} tx: ${log.transactionHash}`);
-                const eigenLogs = await l1Client.getLogs({  
-                    address: l1.eigen_delegationManager as `0x${string}` | undefined,
-                    event: eigenlayerEvents.withdrawalQueued,
-                    // not indexed.. 
-                    // args: [{
-                    //     staker: log.args.staker
-                    // }],
-                    fromBlock: log.blockNumber,
-                    toBlock: log.blockNumber,
-                });
-
-                for (const eigenLog of eigenLogs) {
-                    console.log(`EigenLayer withdrawal: ${eigenLog}`);
-                    if (eigenLog.args[1]?.staker === log.args.staker) {
-                        l1QueuedWithdrawals.push(eigenLog.args);
-                    }
-                }
-                console.log(l1QueuedWithdrawals);
+                console.log(`Withdrawal ${log.args.nonce} initiated. WithdrawalId ${log.args.withdrawalId}, amount: ${log.args.assets}, shares: ${log.args.shares}, block: ${log.blockNumber} tx: ${log.transactionHash}`);
+                const transaction = await l1Client.waitForTransactionReceipt({ hash: log.transactionHash });
+                getEigenLayerQueuedWithdrawals(transaction.blockNumber, log.args.staker!);
            }
         }
     });
 
-    const l1CompletedWithdrawals = []; 
+    const l1CompletedWithdrawals: { assets?: bigint | undefined; shares?: bigint | undefined; strategy?: `0x${string}` | undefined; }[] = []; 
 
     const unwatchFloxiL1WithdrawalCompleted = l1Client.watchEvent({
         address: l1.floxiL1 as `0x${string}` | undefined,
@@ -386,11 +463,78 @@ const main = async () => {
             l2Token: l2.sfrxEth as `0x${string}`,
             from: l1.floxiL1 as `0x${string}`,
         },
-        onLogs: (logs) => {
+        onLogs: async (logs) => {
+
+            let amount: bigint = 0n;
+            let count: bigint = 0n;
+
             for (const log of logs) {
                 console.log(`L2StandardBridge deposit finalized, amount: ${log.args.amount}, tx: ${log.transactionHash}`);
-                l1CompletedWithdrawals.push(log.args)
-           }
+                const withdrawal = l1CompletedWithdrawals.find((withdrawal) => {
+                    return withdrawal.assets === log.args.amount;
+                });
+
+                if (withdrawal && withdrawal.assets && (count < 800n)) {
+                    amount += withdrawal.assets;
+                    l1CompletedWithdrawals.splice(l1CompletedWithdrawals.findIndex(entry => entry === withdrawal), 1);
+                    count += 1n;
+                }
+            }
+
+            try {
+
+                const l1Assets = await l2Client.readContract({
+                    address: l2.floxiL2 as `0x${string}`,
+                    abi: floxiL2Abi,
+                    functionName: 'getL1Assets',
+                });
+
+                const updatedL1Assets = l1Assets - amount;
+
+                console.log(`updating L1Assets to: ${updatedL1Assets}`);
+
+                const { request: rq1 } = await l2Client.simulateContract({
+                    address: l2.floxiL2 as `0x${string}`,
+                    abi: floxiL2Abi,
+                    functionName: 'setL1Assets',
+                    args: [updatedL1Assets],
+                    account: deployer,
+                    maxFeePerGas: 10000000000n,
+                    maxPriorityFeePerGas: 10000000000n,
+                    gas: 3500000n,
+                });
+
+                const txhash1 = await l2WalletClient.writeContract(rq1);
+        
+                const transaction1 = await l2Client.waitForTransactionReceipt({ hash: txhash1 })
+
+                console.log(`L1 assets update successful, tx ${txhash1}, receipt: ${transaction1}`);
+
+                const { request: rq2 } = await l2Client.simulateContract({
+                    address: l2.floxiL2 as `0x${string}`,
+                    abi: floxiL2Abi,
+                    functionName: 'unlockWithdrawals',
+                    args: [amount, count],
+                    account: deployer,
+                    maxFeePerGas: 10000000000n,
+                    maxPriorityFeePerGas: 10000000000n,
+                    gas: 3500000n,
+                });
+
+                const txhash2 = await l2WalletClient.writeContract(rq2);
+        
+                const transaction2 = await l2Client.waitForTransactionReceipt({ hash: txhash2 })
+
+                console.log(`withdrawals unlocked, amount: ${amount}, tx ${txhash2}, receipt: ${transaction2}`);
+                console.log(`account balance L2 after tx: ${await l2Client.getBalance({
+                    address: deployer.address,
+                    blockTag: 'latest'
+            })}`)
+
+            } catch (e) {
+                console.warn(`failed to complete withdrawal unlock ${l1CompletedWithdrawals}`);
+                console.log(e);
+            }
         }
     });
 
@@ -478,7 +622,7 @@ const main = async () => {
                 for (const hash of departed) {
                     if (hash === log.args.hash) {
                        console.log(`Disembarked: ${hash}`);
-                       handleDisembark(hash!);
+                       handleDisembark(hash!, log.blockNumber);
                        departed.splice(departed.findIndex(entry => entry === hash), 1);
                        console.log(departed)
                     }
@@ -500,194 +644,3 @@ const main = async () => {
 
 
 main();
-
-// L2 events
-// const floxiL2_Deposit = parseAbiItem('event Deposit(address indexed from, uint256 amount)');
-// const floxiL2_AssetsShippedToL1 = parseAbiItem('event AssetsShippedToL1(address indexed receiver, uint256 assets)');
-// const floxiL2_WithdrawalQueued = parseAbiItem('event WithdrawalQueued(address indexed account, uint256 indexed nonce, uint256 assets)');
-// const floxiL2_WithdrawalsUnlocked = parseAbiItem('event WithdrawalsUnlocked(uint256 indexed assetsUnlocked, uint256 fromNonce, uint256 toNonce)');
-
-// const fraxFerryL2_Embark = parseAbiItem('event Embark(address indexed sender, uint index, uint amount, uint amountAfterFee, uint timestamp)');
-// const fraxFerryL2_Depart = parseAbiItem('event Depart(uint batchNo, uint start, uint end, bytes32 hash)');
-
-// const l2StandardBridge_DepositFinalized = parseAbiItem('event DepositFinalized(address indexed l1Token, address indexed l2Token, address indexed from, address to, uint256 amount, bytes extraData)');
-
-// // L1 events
-// const floxiL1_AssetsDepositedIntoStrategy = parseAbiItem('event AssetsDepositedIntoStrategy(uint256 assets, uint256 shares, address strategy)');
-// const floxiL1_WithdrawalInitiated = parseAbiItem('event WithdrawalInitiated(bytes32 indexed withdrawalId, address staker, address withdrawer, uint256 indexed nonce, uint256 startBlock, address strategy, uint256 shares, uint256 assets, bytes32 indexed withdrawalRoot)');
-// const floxiL1_WithdrawalCompleted = parseAbiItem('event WithdrawalCompleted(uint256 assets, uint256 shares, address strategy)');
-// const floxiL1_AssetsShippedToL2 = parseAbiItem('event AssetsShippedToL2(address indexed receiver, uint256 assets)');
-
-// const fraxFerryL1_Disembark = parseAbiItem('event Disembark(uint start, uint end, bytes32 hash)');
-
-
-
-
-// dotenv.config();
-
-// const {
-//   L2_RPC_URL,
-//   L1_RPC_URL,
-//   DEPLOYER_PRIVATE_KEY,
-//   L1_FLOXI_ADDRESS,
-//   L2_FLOXI_ADDRESS,
-//   FRA_FERRY_L1_ADDRESS,
-//   FRA_FERRY_L2_ADDRESS,
-// } = process.env;
-
-// const l1Provider = new ethers.JsonRpcProvider(L1_RPC_URL);
-// const l2Provider = new ethers.JsonRpcProvider(L2_RPC_URL);
-// const wallet = new ethers.Wallet(DEPLOYER_PRIVATE_KEY!);
-// const l1Signer = wallet.connect(l1Provider);
-// const l2Signer = wallet.connect(l2Provider);
-
-// const optimismMessenger = new CrossChainMessenger({
-//   l1SignerOrProvider: l1Signer,
-//   l2SignerOrProvider: l2Signer,
-//   l1ChainId: 1,
-//   l2ChainId: 10,
-//   bedrock: true,
-// });
-
-// const FloxiL1ABI = [
-//   'event AssetsDepositedIntoStrategy(uint256 assets, uint256 shares, address strategy)',
-//   'event WithdrawalInitiated(bytes32 indexed withdrawalId, address staker, address withdrawer, uint256 indexed nonce, uint256 startBlock, address strategy, uint256 shares, uint256 assets, bytes32 indexed withdrawalRoot)',
-//   'event WithdrawalCompleted(uint256 assets, uint256 shares, address strategy)',
-//   'event AssetsShippedToL2(address indexed receiver, uint256 assets)',
-//   'function completeEigenlayerWithdrawal((address,address,address,uint256,uint32,address[],uint256[])) external',
-//   'function shipToL2() external',
-// ];
-
-// const FloxiL2ABI = [
-//   'event AssetsDeposited(address indexed caller, address indexed receiver, uint256 assets, uint256 shares, uint256 fee)',
-//   'event AssetsShippedToL1(address indexed receiver, uint256 assets)',
-//   'event WithdrawalQueued(address indexed account, uint256 indexed nonce, uint256 assets)',
-//   'event WithdrawalsUnlocked(uint256 indexed assetsUnlocked, uint256 fromNonce, uint256 toNonce)',
-//   'function unlockWithdrawals(uint256 assets, uint256 maxIterations) external',
-// ];
-
-// const fraxFerryL2ABI = [
-//   'event Embark(address indexed sender, uint index, uint amount, uint amountAfterFee, uint timestamp)',
-//   'event Depart(uint batchNo, uint start, uint end, bytes32 hash)',
-//   'event RemoveBatch(uint batchNo)',
-//   'event Cancelled(uint index, bool cancel)',
-// ];
-
-// const fraxFerryL1ABI = [
-//   'event Disembark(uint start, uint end, bytes32 hash)',
-// ];
-
-// const floxiL1 = new ethers.Contract(L1_FLOXI_ADDRESS, FloxiL1ABI, l1Signer);
-// const floxiL2 = new ethers.Contract(L2_FLOXI_ADDRESS, FloxiL2ABI, l2Signer);
-// const fraxFerryL2 = new ethers.Contract(FRA_FERRY_L2_ADDRESS, fraxFerryL2ABI, l2Signer);
-// const fraxFerryL1 = new ethers.Contract(FRA_FERRY_L1_ADDRESS, fraxFerryL1ABI, l1Signer);
-
-// // Variables to store state
-// let departEvents: any = {};
-// const withdrawalQueue: any = [];
-
-// // Deposit Flow
-
-// // Listen to AssetsDeposited event on Floxi L2
-// floxiL2.on('Deposit', (caller, receiver, assets, shares, fee) => {
-//     console.log(`AssetsDeposited on L2: caller=${caller}, receiver=${receiver}, assets=${assets}, shares=${shares}, fee=${fee}`);
-// });
-
-// // Listen to AssetsShippedToL1 event on Floxi L2
-// floxiL2.on('AssetsShippedToL1', (receiver, assets) => {
-//     console.log(`Assets shipped to L1: receiver=${receiver}, assets=${assets}`);
-// });
-
-// // Listen to Embark event on FraxFerry L2
-// fraxFerryL2.on('Embark', (sender, index, amount, amountAfterFee, timestamp) => {
-//     console.log(`Embark event on L2: sender=${sender}, index=${index}, amount=${amount}, amountAfterFee=${amountAfterFee}, timestamp=${timestamp}`);
-// });
-
-// // Listen to Depart event on FraxFerry L2
-// fraxFerryL2.on('Depart', (batchNo, start, end, hash) => {
-//     console.log(`Depart event on L2: batchNo=${batchNo}, start=${start}, end=${end}, hash=${hash}`);
-//     departEvents[batchNo] = { start, end, hash };
-// });
-
-// // Listen to RemoveBatch event on FraxFerry L2
-// fraxFerryL2.on('RemoveBatch', (batchNo) => {
-//     console.log(`RemoveBatch event on L2: batchNo=${batchNo}`);
-//     delete departEvents[batchNo];
-// });
-
-// // Listen to Cancelled event on FraxFerry L2
-// fraxFerryL2.on('Cancelled', (index, cancel) => {
-//     console.log(`Cancelled event on L2: index=${index}, cancel=${cancel}`);
-// });
-
-// // Listen to Disembark event on FraxFerry L1
-// fraxFerryL1.on('Disembark', (start, end, hash) => {
-//     console.log(`Disembark event on L1: start=${start}, end=${end}, hash=${hash}`);
-//     for (const batchNo in departEvents) {
-//         const { start: recordedStart, end: recordedEnd, hash: recordedHash } = departEvents[batchNo];
-//         if (recordedStart === start && recordedEnd === end && recordedHash === hash) {
-//             console.log(`Match found for batchNo=${batchNo}. Proceeding with L1 deposit.`);
-//             floxiL1.depositAssetsIntoStrategy();
-//             delete departEvents[batchNo];
-//             break;
-//         }
-//     }
-// });
-
-
-// // Withdrawal Flow
-
-// // Listen to WithdrawalQueued event on Floxi L2
-// floxiL2.on('WithdrawalQueued', (account, nonce, assets) => {
-//     console.log(`WithdrawalQueued on L2: account=${account}, nonce=${nonce}, assets=${assets}`);
-// });
-
-// // Listen to WithdrawalsUnlocked event on Floxi L2
-// floxiL2.on('WithdrawalsUnlocked', (assetsUnlocked, fromNonce, toNonce) => {
-//     console.log(`WithdrawalsUnlocked on L2: assetsUnlocked=${assetsUnlocked}, fromNonce=${fromNonce}, toNonce=${toNonce}`);
-// });
-
-
-// floxiL2.on('WithdrawalQueued', async (account, nonce, assets, event) => {
-//   const withdrawalHash = event.transactionHash;
-//   console.log(`WithdrawalQueued on L2: ${withdrawalHash}`);
-
-//   const messageStatus = await optimismMessenger.getMessageStatus(withdrawalHash);
-//   if (messageStatus === MessageStatus.RELAYED) {
-//     console.log(`Withdrawal safe on L1 for account: ${account}, assets: ${assets}`);
-//     await floxiL1.initiateEigenlayerWithdrawal([account, nonce, assets]);
-//   }
-// });
-
-// floxiL1.on('WithdrawalInitiated', (withdrawalId, staker, withdrawer, nonce, startBlock, strategy, shares, assets, withdrawalRoot) => {
-//   console.log(`WithdrawalInitiated on L1: ${withdrawalId}`);
-//   withdrawalQueue.push({ withdrawalId, staker, withdrawer, nonce, startBlock, strategy, shares, assets, withdrawalRoot, timestamp: Date.now() });
-// });
-
-// floxiL1.on('WithdrawalCompleted', async (assets, shares, strategy) => {
-//   console.log(`WithdrawalCompleted: assets=${assets}, shares=${shares}, strategy=${strategy}`);
-//   const currentTime = Date.now();
-
-//   for (const record of withdrawalQueue) {
-//     if (currentTime - record.timestamp > 30 * 24 * 60 * 60 * 1000) { // 1 month
-//       try {
-//         await floxiL1.completeEigenlayerWithdrawal(record);
-//         withdrawalQueue.splice(withdrawalQueue.indexOf(record), 1);
-//         console.log(`Withdrawal ${record.withdrawalId} processed and removed from queue`);
-//       } catch (error) {
-//         console.error(`Error processing withdrawal ${record.withdrawalId}:`, error);
-//       }
-//     }
-//   }
-
-//   try {
-//     await floxiL1.shipToL2();
-//     console.log('Assets shipped back to L2.');
-//   } catch (error) {
-//     console.error('Error shipping assets to L2:', error);
-//   }
-// });
-
-// floxiL2.on('WithdrawalsUnlocked', async (assetsUnlocked, fromNonce, toNonce) => {
-//   console.log(`WithdrawalsUnlocked: assetsUnlocked=${assetsUnlocked}, fromNonce=${fromNonce}, toNonce=${toNonce}`);
-// });
