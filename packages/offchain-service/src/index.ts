@@ -32,37 +32,7 @@ const l2Client = getFraxtalClient(env);
 const l1Client = getMainnetClient(env);
 const deployer = privateKeyToAccount(`0x${process.env.DEPLOYER_PRIVATE_KEY!.slice(2)}`);
 const l1WalletClient = getMainnetWalletClient(env);
-const l2WalletClient = getFraxtalWalletClient(env);
-
-
-// l2.fraxFerry = '0x1794Be9dFEdF17619386fE69C756448f9cF64734';
-// l2.floxiL2 = '0xb0754B937bD306fE72264274A61BC03F43FB685F';
-// l1.fraxFerry = '0x6014c4fD1BC5C8FC8c70838644b095AFCa53F568'
-
-
-// const fraxFerryL1Abi = parseAbi([
-//     'function transferOwnership(address newOwner) external',
-// ]);
-
-// console.log(deployer.address)
-
-// const { request } = await l1Client.simulateContract({
-//     address: l1.fraxFerry as `0x${string}`,
-//     abi: fraxFerryL1Abi,
-//     functionName: 'transferOwnership',
-//     args:[l2.floxiL2 as `0x${string}`],
-//     account: deployer,
-//     gas: 200000n
-// });
-
-// const txhash = await l1WalletClient.writeContract(request);
-
-// console.log(txhash);
-
-// const unwatch = l1Client.watchPendingTransactions( 
-//     { onTransactions: hashes => console.log(hashes) }
-// )
-  
+const l2WalletClient = getFraxtalWalletClient(env);  
 
 console.log(`account balance fraxtal: ${await l2Client.getBalance({
     address: deployer.address,
@@ -136,8 +106,8 @@ const floxiL2Abi = parseAbi([
     'function getL1Assets() view returns (uint256)',
 ]);
 
-const l1QueuedWithdrawals: any[] = [];
 //checks if there are withdrawals to finalize
+const l1QueuedWithdrawals: any[] = [];
 const job = CronJob.from({
 	cronTime: '1 * * * * *',
 	onTick: async function () {
@@ -397,7 +367,6 @@ const handleDisembark = async (hash:`0x${string}`, blockNumber: bigint) => {
 }
 
 // event listeners
-
 const main = async () => {
 
     console.log((await l2Client.getBlock()).number)
@@ -409,7 +378,6 @@ const main = async () => {
     })).number);
 
     // withdraw flow listeners
-
     // const l2QueuedWithdrawals = []; 
     const unwatchFloxiL2WithdrawalQueued = l2Client.watchEvent({
         address: l2.floxiL2 as `0x${string}` | undefined,
@@ -539,7 +507,6 @@ const main = async () => {
     });
 
     /// Deposit flow listeners
-
     const unwatchFloxiL2Deposit = l2Client.watchEvent({
         address: l2.floxiL2 as `0x${string}` | undefined,
         event: floxiL2Events.deposit,

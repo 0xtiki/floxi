@@ -571,29 +571,44 @@ describe("L1Floxi", function () {
       );
     });
 
-    it("should send cross domain message", async function () {
+    it("should send to bridge and cross domain messenger", async function () {
       const contractAddress = await contract.getAddress();
 
-      // Step 1: Transfer sfrxEth to the contract
-      await sfrxEth.transfer(contractAddress, ethers.parseEther("10"));
-      const contractBalance = await sfrxEth.balanceOf(contractAddress);
-      console.log(`Contract balance after transfer: ${contractBalance.toString()}`);
-      expect(contractBalance).to.equal(ethers.parseEther("10"));
+      const tx = await contract.setRemoteContract("0x36cb65c1967A0Fb0EEE11569C51C2f2aA1Ca6f6D");
+      await tx.wait();
 
-      // Step 2: Deposit into the Eigenlayer strategy
-      const depositTx = await contract.connect(owner).depositIntoStrategy();
-      const receipt = await depositTx.wait();
-      console.log(`Deposit transaction successful, gas used: ${receipt?.gasUsed.toString()}`);
+      // Step 2: Bridge and expect events
+      const xDomainMessenger = "0x36cb65c1967A0Fb0EEE11569C51C2f2aA1Ca6f6D";
+      const xDomainMessengerContract = new ethers.Contract(
+        xDomainMessenger,
+        [
+          "event TransactionDeposited(address indexed from, address indexed to, uint256 indexed version, bytes opaqueData)",
+        ],
+        owner,
+      );
+
+      const l1StandardBridgeAddress = "0x34C0bD5877A5Ee7099D0f5688D65F4bB9158BDE2";
+      const l1StandardBridgeContract = new ethers.Contract(
+        l1StandardBridgeAddress,
+        [
+          "event ERC20DepositInitiated(address indexed l1Token, address indexed l2Token, address indexed from, address to, uint256 amount, bytes extraData)",
+        ],
+        owner,
+      );
 
       // Step 3: Assertions
-      const totalAssets = await contract.totalAssets();
-      console.log(`Total Assets: ${totalAssets.toString()}`);
-      expect(totalAssets).to.equal(ethers.parseEther("10"));
 
-      // Step 4: Send cross domain message to update total assets on l2
-      const xdomainTx = await contract.connect(owner).updateTotalAssetsL2();
-      const xreceipt = await xdomainTx.wait();
-      console.log(`Sent message to xDomainMessenger, gas used: ${xreceipt?.gasUsed.toString()}`);
+      await expect(contract.connect(owner).shipToL2())
+        .to.emit(xDomainMessengerContract, "TransactionDeposited")
+        .and.to.emit(l1StandardBridgeContract, "ERC20DepositInitiated")
+        .withArgs(
+          "0xac3E018457B222d93114458476f3E3416Abbe38F",
+          "0xFC00000000000000000000000000000000000005",
+          contractAddress,
+          "0x36cb65c1967A0Fb0EEE11569C51C2f2aA1Ca6f6D",
+          ethers.parseEther("0"),
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+        );
     });
   });
 });

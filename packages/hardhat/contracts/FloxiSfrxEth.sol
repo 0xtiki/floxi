@@ -257,6 +257,8 @@ contract FloxiSfrxEth is ERC4626, ReentrancyGuard, Ownable {
 
             _queuedAssets[bytes32ToAddress] -= assets;
 
+            _activeWithdrawalsCount[bytes32ToAddress] -= 1;
+
             _unlockNonce += 1;
 
             i += assets;

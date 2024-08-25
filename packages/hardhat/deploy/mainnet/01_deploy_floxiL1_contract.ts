@@ -59,7 +59,7 @@ const deployFloxiL1: DeployFunction = async function (hre: HardhatRuntimeEnviron
 
   // console.log(`FloxiL1 claimer set to: ${l1.treasury}`);
 
-  // await floxiSfraxEth.delegate(l1.eigen_operator);
+  // await floxiSfraxEth.setDelegate(l1.eigen_operator);
 
   // console.log(`FloxiL1 delegate set to: ${l1.eigen_operator}`);
 
