@@ -28,7 +28,10 @@ const Home: NextPage = () => {
     setIsModalOpen(false);
   };
 
-  const [ethAmount, setEthAmount] = useState("");
+  const [ethAmount1, setEthAmount1] = useState("");
+  const [ethAmount2, setEthAmount2] = useState("");
+  const [ethAmount3, setEthAmount3] = useState("");
+  const [ethAmount4, setEthAmount4] = useState("");
 
   return (
     <>
@@ -38,7 +41,9 @@ const Home: NextPage = () => {
             <div id="slide1" className="carousel-item relative w-full">
               <div className="card card-compact bg-base-100 w-96 shadow-xl border-2 border-primary">
                 <figure>
-                  <img src="/floxiEthVault.png" alt="Staked Frax Ether Vault" />
+                  <picture>
+                    <img src="/floxiEthVault.png" alt="Staked Frax Ether Vault" />
+                  </picture>
                 </figure>
                 <div className="card-body">
                   <h2 className="card-title">Staked Frax ETH Vault</h2>
@@ -55,7 +60,9 @@ const Home: NextPage = () => {
             <div id="slide2" className="carousel-item relative w-full">
               <div className="card card-compact bg-base-100 w-96 shadow-xl border-2 border-primary relative overflow-hidden">
                 <figure className="grayscale opacity-50">
-                  <img src="/floxi_logo.webp" alt="Staked Frax Ether Vault" />
+                  <picture>
+                    <img src="/floxi_logo.webp" alt="Staked Frax Ether Vault" />
+                  </picture>
                 </figure>
                 <div className="card-body opacity-50 ">
                   <h2 className="card-title">FRAX Vault</h2>
@@ -75,7 +82,9 @@ const Home: NextPage = () => {
             <div id="slide3" className="carousel-item relative w-full">
               <div className="card card-compact bg-base-100 w-96 shadow-xl border-2 border-primary relative overflow-hidden">
                 <figure className="grayscale opacity-50">
-                  <img src="/floxi_logo.webp" alt="Staked Frax Ether Vault" />
+                  <picture>
+                    <img src="/floxi_logo.webp" alt="Staked Frax Ether Vault" />
+                  </picture>
                 </figure>
                 <div className="card-body opacity-50 ">
                   <h2 className="card-title">FXS Vault</h2>
@@ -120,7 +129,13 @@ const Home: NextPage = () => {
                 <div role="tabpanel" className="tab-content p-10">
                   <h3 className="font-bold text-lg">Deposit & Stake</h3>
                   <p className="py-0">Step 1: Deposit assets</p>
-                  <EtherInput value={ethAmount} placeholder="amount" onChange={amount => setEthAmount(amount)} />
+                  <EtherInput
+                    key="1"
+                    contractName="sFraxEth"
+                    value={ethAmount1}
+                    placeholder="amount"
+                    onChange={amount => setEthAmount1(amount)}
+                  />
                   <div className="flex justify-end w-full mt-2">
                     <Link
                       href={""}
@@ -130,7 +145,13 @@ const Home: NextPage = () => {
                     </Link>
                   </div>
                   <p className="py-0">Step 2: Claim shares</p>
-                  <EtherInput value={ethAmount} placeholder="amount" onChange={amount => setEthAmount(amount)} />
+                  <EtherInput
+                    key="2"
+                    contractName="FloxiSfrxEth"
+                    value={ethAmount2}
+                    placeholder="amount"
+                    onChange={amount => setEthAmount2(amount)}
+                  />
                   <div className="flex justify-end w-full mt-2">
                     <Link
                       href={""}
@@ -149,7 +170,13 @@ const Home: NextPage = () => {
                 <div role="tabpanel" className="tab-content p-10">
                   <h3 className="font-bold text-lg">Unstake & Withdraw</h3>
                   <p className="py-0">Step 1: Request withdrawal</p>
-                  <EtherInput value={ethAmount} placeholder="amount" onChange={amount => setEthAmount(amount)} />
+                  <EtherInput
+                    key="3"
+                    contractName="sFraxEth"
+                    value={ethAmount3}
+                    placeholder="amount"
+                    onChange={amount => setEthAmount3(amount)}
+                  />
                   <div className="flex justify-end w-full mt-2">
                     <Link
                       href={""}
@@ -159,7 +186,13 @@ const Home: NextPage = () => {
                     </Link>
                   </div>
                   <p className="py-0">Step 2: Claim assets</p>
-                  <EtherInput value={ethAmount} placeholder="amount" onChange={amount => setEthAmount(amount)} />
+                  <EtherInput
+                    key="4"
+                    contractName="FloxiSfrxEth"
+                    value={ethAmount4}
+                    placeholder="amount"
+                    onChange={amount => setEthAmount4(amount)}
+                  />
                   <div className="flex justify-end w-full mt-2">
                     <Link
                       href={""}
