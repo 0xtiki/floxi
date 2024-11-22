@@ -127,6 +127,16 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
     uint256 private _withdrawQueueNonce;
     uint256 private _bridgeDepositNonce;
     address private _remoteContract; // floxi l2
+    uint256 private _maxIterations = 800;
+    uint32 private _l2GasLimit = 2000000;
+
+    function setMaxIterations(uint256 maxIterations_) external onlyOwner {
+        _maxIterations = maxIterations_;
+    }
+
+    function setL2GasLimit(uint32 l2GasLimit_) external onlyOwner {
+        _l2GasLimit = l2GasLimit_;
+    }
 
     function setRemoteContract(address floxiL2) public onlyOwner {
         _remoteContract = floxiL2;
@@ -207,7 +217,7 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
 
         _asset.approve(_eigenLayerStrategyManager, deposit);
 
-        require(_asset.allowance(address(this), _eigenLayerStrategyManager) == deposit, "Token approval failed");
+        require(_asset.allowance(address(this), _eigenLayerStrategyManager) >= deposit, "Token approval failed");
 
         uint256 shares = IEigenLayerStrategyManager(_eigenLayerStrategyManager).depositIntoStrategy(address(_eigenLayerStrategy), address(_asset), deposit);
 
@@ -218,6 +228,8 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
             shares,
             address(_eigenLayerStrategy)
         );
+
+        require(unlockDepositsL2(deposit, shares) == true, "Failed to update L2 assets");
     }
 
     // POC, should receive shares as input and generate IDelegationManager.QueuedWithdrawalParams[] but not enough time to debug
@@ -325,14 +337,30 @@ contract L1FloxiSfrxEth is ReentrancyGuard, Ownable {
         require(updateTotalAssetsL2() == true, "Failed to update L2 assets");
     }
 
-    function updateTotalAssetsL2() internal returns (bool) {
-        bytes memory message = abi.encodeWithSignature("updateL1Assets(uint256)", totalAssets());
+    function unlockDepositsL2(uint256 assets_, uint256 shares_) internal returns (bool) {
+        bytes memory message = abi.encodeWithSignature("unlockDeposits(uint256,uint256,uint256,uint256,uint256)", assets_, shares_, totalAssets(), totalShares(), _maxIterations);
 
         // Send the message to L2 via the Cross Domain Messenger
         try ICrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
             _remoteContract, // Address of the L2 contract to call
             message, // Encoded message data
-            2000000  // Gas limit for the message execution on L2
+            _l2GasLimit  // Gas limit for the message execution on L2
+        ) {
+            return true;
+        } 
+        catch {
+            revert("Failed to send xDomain message");
+        }
+    }
+
+    function updateTotalAssetsL2() internal returns (bool) {
+        bytes memory message = abi.encodeWithSignature("updateL1Assets(uint256,uint256)", totalAssets(), totalShares());
+
+        // Send the message to L2 via the Cross Domain Messenger
+        try ICrossDomainMessenger(_l1CrossDomainMessenger).sendMessage(
+            _remoteContract, // Address of the L2 contract to call
+            message, // Encoded message data
+            _l2GasLimit  // Gas limit for the message execution on L2
         ) {
             return true;
         } 
